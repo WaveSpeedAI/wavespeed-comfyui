@@ -502,8 +502,12 @@ class WaveSpeedAPI:
             raise ValueError("strength must be between 0.0 and 1.0")
         if width < 512 or width > 1536 or height < 512 or height > 1536:
             raise ValueError("Width and height must be between 512 and 1536")
-        if num_inference_steps < 1 or num_inference_steps > 50:
-            raise ValueError("num_inference_steps must be between 1 and 50")
+        if model == "flux-dev":
+            if num_inference_steps < 1 or num_inference_steps > 50:
+                raise ValueError("num_inference_steps must be between 1 and 50")
+        elif model == "flux-schnell":
+            if num_inference_steps < 1 or num_inference_steps > 8:
+                raise ValueError("num_inference_steps must be between 1 and 8")
         if guidance_scale < 0.0 or guidance_scale > 10.0:
             raise ValueError("guidance_scale must be between 0.0 and 10.0")
         if num_images < 1 or num_images > 4:
