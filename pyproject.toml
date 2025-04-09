@@ -1,0 +1,15 @@
+[project]
+name = "wavespeed-comfyui"
+description = "This is a custom node for ComfyUI that allows you to use the WaveSpeed AI API directly in ComfyUI. WaveSpeed AI is a high-performance AI image and video generation service platform offering industry-leading generation speeds. For more information, see [a/WaveSpeed AI Documentation](https://wavespeed.ai/docs)."
+version = "1.0.0"
+license = {file = "LICENSE"}
+dependencies = ["requests", "pillow"]
+
+[project.urls]
+Repository = "https://github.com/WaveSpeedAI/wavespeed-comfyui"
+#  Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = "wavespeed-ai"
+DisplayName = "wavespeed-comfyui"
+Icon = ""
