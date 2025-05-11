@@ -1,17 +1,11 @@
-from .wavespeed_api import WaveSpeedAPI
-import base64
-import io
 import os
-import re
-import numpy
-import PIL
 import requests
-import torch
-from collections.abc import Iterable
 import configparser
 import folder_paths
 import time
-from typing import List, Dict, Any, Tuple, Optional, Union
+import torchaudio
+from .wavespeed_api.client import WaveSpeedClient
+from .wavespeed_api.utils import tensor2images
 
 try:
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -29,51 +23,6 @@ except Exception as e:
     print(f"Error reading or creating config file: {e}")
     config = None
 
-
-def _fetch_image(url, stream=True):
-    return requests.get(url, stream=stream).content
-
-
-def _tensor2images(tensor):
-    np_imgs = numpy.clip(tensor.cpu().numpy() * 255.0, 0.0, 255.0).astype(numpy.uint8)
-    return [PIL.Image.fromarray(np_img) for np_img in np_imgs]
-
-
-def _images2tensor(images):
-    if isinstance(images, Iterable):
-        return torch.stack([torch.from_numpy(numpy.array(image)).float() / 255.0 for image in images])
-    return torch.from_numpy(numpy.array(images)).unsqueeze(0).float() / 255.0
-
-
-def _decode_image(data_bytes, rtn_mask=False):
-    with io.BytesIO(data_bytes) as bytes_io:
-        img = PIL.Image.open(bytes_io)
-        if not rtn_mask:
-            img = img.convert('RGB')
-        elif 'A' in img.getbands():
-            img = img.getchannel('A')
-        else:
-            img = None
-    return img
-
-
-def _encode_image(img, mask=None):
-    if mask is not None:
-        img = img.copy()
-        img.putalpha(mask)
-    with io.BytesIO() as bytes_io:
-        if mask is not None:
-            img.save(bytes_io, format='PNG')
-        else:
-            img.save(bytes_io, format='JPEG')
-        data_bytes = bytes_io.getvalue()
-    return data_bytes
-
-
-def _image_to_base64(image):
-    if image is None:
-        return None
-    return base64.b64encode(_encode_image(_tensor2images(image)[0])).decode("utf-8")
 
 class WaveSpeedAIAPIClient:
     """
@@ -110,6 +59,7 @@ class WaveSpeedAIAPIClient:
         Returns:
             WaveSpeedAPI: WaveSpeed AI API client
         """
+        wavespeed_api_key = ""
         if api_key == "":
             try:
                 wavespeed_api_key = config['API']['WAVESPEED_API_KEY']
@@ -119,11 +69,58 @@ class WaveSpeedAIAPIClient:
             except KeyError:
                 raise ValueError('Unable to find API_KEY in config.ini')
 
-            client = WaveSpeedAPI(wavespeed_api_key)
         else:
-            client = WaveSpeedAPI(api_key)
+            wavespeed_api_key = api_key
 
-        return (client,)
+        return ({
+            "api_key": wavespeed_api_key
+        },)
+
+
+class SaveAudio:
+    """
+    Preview Audio Node for ComfyUI
+    """
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "audio_url": ("STRING", {"forceInput": False}),
+                "save_file_prefix": ("STRING", {"default": "wavespeed_audio"}),
+            }
+        }
+
+    OUTPUT_NODE = True
+    FUNCTION = "run"
+    CATEGORY = "WaveSpeedAI"
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("path",)
+
+    def run(self, audio_url, save_file_prefix):
+        if not audio_url:
+            raise ValueError("No audio URL provided")
+
+        try:
+            response = requests.get(audio_url)
+            response.raise_for_status()
+            audio_data = response.content
+        except requests.RequestException as e:
+            raise RuntimeError(f"Error downloading audio: {e}")
+        file_extension = os.path.splitext(audio_url)[-1]
+        if not file_extension or file_extension == '.':
+            file_extension = '.mp3'
+        else:
+            file_extension = file_extension.lower()
+
+        full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(save_file_prefix, folder_paths.get_output_directory())
+
+        file = f"{filename}_{counter:05}_{file_extension}"
+        file_path = os.path.join(full_output_folder, file)
+
+        with open(file_path, "wb") as f:
+            f.write(audio_data)
+
+        return (file_path,)
 
 
 class PreviewVideo:
@@ -137,8 +134,8 @@ class PreviewVideo:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "video_url": ("STRING", {"forceInput": True}),
-                "filename_prefix": ("STRING", {"default": "wavespeed_video"}),
+                "video_url": ("STRING", {"forceInput": False}),
+                "save_file_prefix": ("STRING", {"default": "wavespeed_video"}),
             }
         }
 
@@ -148,13 +145,13 @@ class PreviewVideo:
     RETURN_TYPES = ()
     RETURN_NAMES = ()
 
-    def run(self, video_url, filename_prefix):
+    def run(self, video_url, save_file_prefix):
         """
         Preview and save a video
 
         Args:
             video_url: URL of the video
-            filename_prefix: Prefix for the saved file
+            save_file_prefix: Prefix for the saved file
 
         Returns:
             str: Path to the saved video file
@@ -169,8 +166,14 @@ class PreviewVideo:
         except requests.RequestException as e:
             raise RuntimeError(f"Error downloading video: {e}")
 
+        file_extension = os.path.splitext(video_url)[-1]
+        if not file_extension or file_extension == '.':
+            file_extension = '.mp4'
+        else:
+            file_extension = file_extension.lower()
+
         output_dir = folder_paths.get_output_directory()
-        filename = f"{filename_prefix}_{int(time.time())}.mp4"
+        filename = f"{save_file_prefix}_{int(time.time())}{file_extension}"
         file_path = os.path.join(output_dir, filename)
 
         with open(file_path, "wb") as f:
@@ -190,7 +193,7 @@ class WanLoras:
     def INPUT_TYPES(s):
         return {
             "required": {
-                "lora1_path": ("STRING", {"multiline": False, "default": ""}),
+                "lora1_path": ("STRING", {"multiline": False, "default": "", "tooltip": "LoRA model url ,like https://huggingface.co/username/model-name/blob/branch/model.safetensors"}),
                 "lora1_scale": ("FLOAT", {
                     "default": 0.8,
                     "min": 0.0,
@@ -200,7 +203,7 @@ class WanLoras:
                 }),
             },
             "optional": {
-                "lora2_path": ("STRING", {"multiline": False, "default": ""}),
+                "lora2_path": ("STRING", {"multiline": False, "default": "", "tooltip": "LoRA model url ,like https://huggingface.co/username/model-name/blob/branch/model.safetensors"}),
                 "lora2_scale": ("FLOAT", {
                     "default": 0.8,
                     "min": 0.0,
@@ -208,7 +211,7 @@ class WanLoras:
                     "step": 0.05,
                     "display": "number"
                 }),
-                "lora3_path": ("STRING", {"multiline": False, "default": ""}),
+                "lora3_path": ("STRING", {"multiline": False, "default": "", "tooltip": "LoRA model url ,like https://huggingface.co/username/model-name/blob/branch/model.safetensors"}),
                 "lora3_scale": ("FLOAT", {
                     "default": 0.8,
                     "min": 0.0,
@@ -219,7 +222,7 @@ class WanLoras:
             }
         }
 
-    RETURN_TYPES = ("WAVESPEED_WAN_LORAS",)
+    RETURN_TYPES = ("WAVESPEED_LORAS",)
     RETURN_NAMES = ("loras",)
 
     FUNCTION = "create_loras"
@@ -269,7 +272,7 @@ class FluxLoras:
     def INPUT_TYPES(s):
         return {
             "required": {
-                "lora1_path": ("STRING", {"multiline": False, "default": ""}),
+                "lora1_path": ("STRING", {"multiline": False, "default": "", "tooltip": "LoRA model url ,like https://huggingface.co/username/model-name/blob/branch/model.safetensors"}),
                 "lora1_scale": ("FLOAT", {
                     "default": 1.0,
                     "min": 0.0,
@@ -279,7 +282,7 @@ class FluxLoras:
                 }),
             },
             "optional": {
-                "lora2_path": ("STRING", {"multiline": False, "default": ""}),
+                "lora2_path": ("STRING", {"multiline": False, "default": "", "tooltip": "LoRA model url ,like https://huggingface.co/username/model-name/blob/branch/model.safetensors"}),
                 "lora2_scale": ("FLOAT", {
                     "default": 1.0,
                     "min": 0.0,
@@ -287,7 +290,7 @@ class FluxLoras:
                     "step": 0.05,
                     "display": "number"
                 }),
-                "lora3_path": ("STRING", {"multiline": False, "default": ""}),
+                "lora3_path": ("STRING", {"multiline": False, "default": "", "tooltip": "LoRA model url ,like https://huggingface.co/username/model-name/blob/branch/model.safetensors"}),
                 "lora3_scale": ("FLOAT", {
                     "default": 1.0,
                     "min": 0.0,
@@ -295,7 +298,7 @@ class FluxLoras:
                     "step": 0.05,
                     "display": "number"
                 }),
-                "lora4_path": ("STRING", {"multiline": False, "default": ""}),
+                "lora4_path": ("STRING", {"multiline": False, "default": "", "tooltip": "LoRA model url ,like https://huggingface.co/username/model-name/blob/branch/model.safetensors"}),
                 "lora4_scale": ("FLOAT", {
                     "default": 1.0,
                     "min": 0.0,
@@ -303,7 +306,7 @@ class FluxLoras:
                     "step": 0.05,
                     "display": "number"
                 }),
-                "lora5_path": ("STRING", {"multiline": False, "default": ""}),
+                "lora5_path": ("STRING", {"multiline": False, "default": "", "tooltip": "LoRA model url ,like https://huggingface.co/username/model-name/blob/branch/model.safetensors"}),
                 "lora5_scale": ("FLOAT", {
                     "default": 1.0,
                     "min": 0.0,
@@ -314,7 +317,7 @@ class FluxLoras:
             }
         }
 
-    RETURN_TYPES = ("WAVESPEED_FLUX_LORAS",)
+    RETURN_TYPES = ("WAVESPEED_LORAS",)
     RETURN_NAMES = ("loras",)
 
     FUNCTION = "create_loras"
@@ -364,585 +367,56 @@ class FluxLoras:
         return (loras,)
 
 
-class FluxImage2Image:
+class UploadImage:
     """
-    Flux Image Generator Node
+    Upload a file to WaveSpeed AI API
 
-    This node uses WaveSpeed AI's Flux model to generate high-quality images.
+    Args:
+        file_path (str): Path to the file to be uploaded
+
+    Returns:
+        dict: API response containing the uploaded file information
     """
-
     @classmethod
     def INPUT_TYPES(s):
         return {
             "required": {
                 "client": ("WAVESPEED_AI_API_CLIENT",),
-                "model": (["flux-dev", "flux-schnell"], {"tooltip": "Model name, choose from flux-dev or flux-schnell"}),
-                "image_url": ("STRING", {"multiline": False, "default": "", "tooltip": "Image URL for image-to-image generation"}),
-                "strength": ("FLOAT", {
-                    "default": 0.6,
-                    "min": 0.0,
-                    "max": 1.0,
-                    "step": 0.1,
-                    "display": "number",
-                    "tooltip": "Strength of the image-to-image transformation (0.0 to 1.0)"
-                }),
-            },
-            "optional": {
-                "prompt": ("STRING", {"multiline": True, "default": "", "tooltip": "Text description of the image to generate"}),
-                "loras": ("WAVESPEED_FLUX_LORAS", {"tooltip": "List of LoRA models to apply (max 5 items)"}),
-                "width": ("INT", {
-                    "default": 1024,
-                    "min": 512,
-                    "max": 1536,
-                    "step": 8,
-                    "display": "number",
-                    "tooltip": "Image width (512 to 1536)"
-                }),
-                "height": ("INT", {
-                    "default": 1024,
-                    "min": 512,
-                    "max": 1536,
-                    "step": 8,
-                    "display": "number",
-                    "tooltip": "Image height (512 to 1536)"
-                }),
-                "num_inference_steps": ("INT", {
-                    "default": 28,
-                    "min": 1,
-                    "max": 50,
-                    "step": 1,
-                    "display": "number",
-                    "tooltip": "Number of inference steps for dev models (1 to 50)"
-                }),
-                "seed": ("INT", {
-                    "default": -1,
-                    "min": -1,
-                    "max": 0xffffffffffffffff,
-                    "control_after_generate": True,
-                    "tooltip": "Random seed for reproducible results. -1 for random seed"
-                }),
-                "guidance_scale": ("FLOAT", {
-                    "default": 5.0,
-                    "min": 0.0,
-                    "max": 10.0,
-                    "step": 0.1,
-                    "display": "number",
-                    "tooltip": "Guidance scale for generation (0.0 to 10.0)"
-                }),
-                "num_images": ("INT", {
-                    "default": 1,
-                    "min": 1,
-                    "max": 4,
-                    "step": 1,
-                    "display": "number",
-                    "tooltip": "Number of images to generate (1 to 4)"
-                }),
-                "enable_safety_checker": ("BOOLEAN", {
-                    "default": True,
-                    "tooltip": "Enable safety checker for generated content"
-                }),
+                "image": ("IMAGE",)
             }
         }
 
-    RETURN_TYPES = ("IMAGE",)
-    RETURN_NAMES = ("image", )
+    DESCRIPTION = "Upload an image to WaveSpeed AI API. The link will expire soon, please do not rely on this link."
 
-    FUNCTION = "generate"
+    RETURN_TYPES = ("STRING", "STRING",)
+    RETURN_NAMES = ("first_image_url", "image_urls",)
 
     CATEGORY = "WaveSpeedAI"
+    FUNCTION = "upload_file"
 
-    def generate(self,
-                 client,
-                 model,
-                 image_url,
-                 strength,
-                 prompt="",
-                 loras=None,
-                 width=1024,
-                 height=1024,
-                 num_inference_steps=28,
-                 seed=-1,
-                 guidance_scale=5.0,
-                 num_images=1,
-                 enable_safety_checker=True):
-        """
-        Generate images using the Flux model
+    def upload_file(self, client, image):
+        images = tensor2images(image)
+        image_urls = []
+        real_client = WaveSpeedClient(api_key=client["api_key"])
+        for image in images:
+            image_url = real_client.upload_file(image)
+            image_urls.append(image_url)
+        return (image_urls[0], image_urls,)
 
-        Args:
-            client: WaveSpeed AI API client
-            model: Model name
-            image_url: Input image for image-to-image generation
-            strength: Strength of image-to-image transformation (0.0 to 1.0)
-            prompt: Text prompt
-            loras: List of LoRA models (max 5)
-            width: Image width (512 to 1536)
-            height: Image height (512 to 1536)
-            num_inference_steps: Number of inference steps (1 to 50)
-            seed: Random seed, -1 for random seed
-            guidance_scale: Generation guidance scale (0.0 to 10.0)
-            num_images: Number of images to generate (1 to 4)
-            enable_safety_checker: Whether to enable safety checker
+NODE_CLASS_MAPPINGS = {
+    'WaveSpeedAI Client': WaveSpeedAIAPIClient,
+    'WaveSpeedAI Wan Loras': WanLoras,
+    'WaveSpeedAI Flux Loras': FluxLoras,
+    'WaveSpeedAI Preview Video': PreviewVideo,
+    'WaveSpeedAI Save Audio': SaveAudio,
+    'WaveSpeedAI Upload Image': UploadImage,
+}
 
-        Returns:
-            tuple: (Generated image)
-        """
-        try:
-            response = client.flux_generate_image(
-                model=model,
-                prompt=prompt,
-                image=image_url,  
-                strength=strength,
-                loras=loras,
-                width=width,
-                height=height,
-                num_inference_steps=num_inference_steps,
-                seed=seed,
-                guidance_scale=guidance_scale,
-                num_images=num_images,
-                enable_safety_checker=enable_safety_checker,
-                wait_for_completion=True
-            )
-            # Download and process images
-            image_urls = response.get("image_urls", [])
-            if not image_urls:
-                raise ValueError("No image URLs in the generated result")
-
-            images = []
-            for url in image_urls:
-                print(f'WaveSpeed AI output: {url}')
-                image_data = _fetch_image(url)
-                image = _decode_image(image_data)
-                images.append(image)
-
-            # Convert to tensor
-            tensor = _images2tensor(images)
-            return (tensor,)
-        except Exception as e:
-            print(f"Generation failed: {str(e)}")
-            raise e
-
-
-class FluxText2Image:
-    """
-    Flux Image Generator Node
-
-    This node uses WaveSpeed AI's Flux model to generate high-quality images.
-    """
-
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "client": ("WAVESPEED_AI_API_CLIENT",),
-                "model": (["flux-dev", "flux-schnell"], {"tooltip": "Model name, choose from flux-dev or flux-schnell"}),
-                "prompt": ("STRING", {"multiline": True, "default": "", "tooltip": "Text description of the image to generate"}),
-            },
-            "optional": {
-                "loras": ("WAVESPEED_FLUX_LORAS", {"tooltip": "List of LoRA models to apply (max 5 items)"}),
-                "width": ("INT", {
-                    "default": 1024,
-                    "min": 512,
-                    "max": 1536,
-                    "step": 8,
-                    "display": "number",
-                    "tooltip": "Image width (512 to 1536)"
-                }),
-                "height": ("INT", {
-                    "default": 1024,
-                    "min": 512,
-                    "max": 1536,
-                    "step": 8,
-                    "display": "number",
-                    "tooltip": "Image height (512 to 1536)"
-                }),
-                "num_inference_steps": ("INT", {
-                    "default": 28,
-                    "min": 1,
-                    "max": 50,
-                    "step": 1,
-                    "display": "number",
-                    "tooltip": "Number of inference steps for dev models (1 to 50)"
-                }),
-                 "seed": ("INT", {
-                    "default": -1,
-                    "min": -1,
-                    "max": 0xffffffffffffffff,
-                    "control_after_generate": True,
-                    "tooltip": "Random seed for reproducible results. -1 for random seed"
-                }),
-                "guidance_scale": ("FLOAT", {
-                    "default": 5.0,
-                    "min": 0.0,
-                    "max": 10.0,
-                    "step": 0.1,
-                    "display": "number",
-                    "tooltip": "Guidance scale for generation (0.0 to 10.0)"
-                }),
-                "num_images": ("INT", {
-                    "default": 1,
-                    "min": 1,
-                    "max": 4,
-                    "step": 1,
-                    "display": "number",
-                    "tooltip": "Number of images to generate (1 to 4)"
-                }),
-                "enable_safety_checker": ("BOOLEAN", {
-                    "default": True,
-                    "tooltip": "Enable safety checker for generated content"
-                }),
-            }
-        }
-
-    RETURN_TYPES = ("IMAGE",)
-    RETURN_NAMES = ("image", )
-
-    FUNCTION = "generate"
-
-    CATEGORY = "WaveSpeedAI"
-
-    def generate(self,
-                 client,
-                 model,
-                 prompt,
-                 loras=None,
-                 width=1024,
-                 height=1024,
-                 num_inference_steps=28,
-                 seed=-1,
-                 guidance_scale=5.0,
-                 num_images=1,
-                 enable_safety_checker=True):
-        """
-        Generate images using the Flux model
-
-        Args:
-            client: WaveSpeed AI API client
-            model: Model name
-            prompt: Text prompt
-            loras: List of LoRA models (max 5)
-            width: Image width (512 to 1536)
-            height: Image height (512 to 1536)
-            num_inference_steps: Number of inference steps (1 to 50)
-            seed: Random seed, -1 for random seed
-            guidance_scale: Generation guidance scale (0.0 to 10.0)
-            num_images: Number of images to generate (1 to 4)
-            enable_safety_checker: Whether to enable safety checker
-
-        Returns:
-            tuple: (Generated image,)
-        """
-        try:
-            response = client.flux_generate_image(
-                model=model,
-                prompt=prompt,
-                loras=loras,
-                width=width,
-                height=height,
-                num_inference_steps=num_inference_steps,
-                seed=seed,
-                guidance_scale=guidance_scale,
-                num_images=num_images,
-                enable_safety_checker=enable_safety_checker,
-                wait_for_completion=True
-            )
-
-            # Download and process images
-            image_urls = response.get("image_urls", [])
-            if not image_urls:
-                raise ValueError("No image URLs in the generated result")
-
-            images = []
-            for url in image_urls:
-                print(f'WaveSpeed AI output: {url}')
-                image_data = _fetch_image(url)
-                image = _decode_image(image_data)
-                images.append(image)
-
-            # Convert to tensor
-            tensor = _images2tensor(images)
-            return (tensor,)
-        except Exception as e:
-            print(f"Generation failed: {str(e)}")
-            raise e
-
-class WanText2VideoNode:
-    """
-    Wan Text to Video Node
-
-    This node uses WaveSpeed AI's Wan T2V model to generate videos from text prompts.
-    """
-
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "client": ("WAVESPEED_AI_API_CLIENT",),
-                "model": (["wan-2.1/t2v-720p", "wan-2.1/t2v-480p","wan-2.1/t2v-720p-ultra-fast", "wan-2.1/t2v-480p-ultra-fast"],),
-                "prompt": ("STRING", {"multiline": True, "default": "", "tooltip": "Text prompt to guide video generation"}),
-            },
-            "optional": {
-                "negative_prompt": ("STRING", {"multiline": True, "default": "", "tooltip": "Negative prompt to specify what to avoid in the video"}),
-                "size": (["None","720*1280", "1280*720", "480*832", "832*480"], {"tooltip": "Video dimensions in width x height format. 480p: 832*480 or 480*832, 720p: 1280*720 or 720*1280"}),
-                "loras": ("WAVESPEED_WAN_LORAS", {"tooltip": "List of LoRA models to apply (maximum 3)"}),
-                "num_inference_steps": ("INT", {
-                    "default": 30,
-                    "min": 1,
-                    "max": 40,
-                    "step": 1,
-                    "display": "number",
-                    "tooltip": "Number of inference steps"
-                }),
-                "guidance_scale": ("FLOAT", {
-                    "default": 5.0,
-                    "min": 0.0,
-                    "max": 10.0,
-                    "step": 0.1,
-                    "display": "number",
-                    "tooltip": "Guidance scale for generation"
-                }),
-                "seed": ("INT", {
-                    "default": -1,
-                    "min": -1,
-                    "max": 0xffffffffffffffff,
-                    "control_after_generate": True,
-                    "tooltip": "Random seed for reproducible results. -1 for random seed"
-                }),
-                "enable_safety_checker": ("BOOLEAN", {"default": True, "tooltip": "Enable safety checker for generated content"}),
-            }
-        }
-
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("url",)
-
-    FUNCTION = "generate"
-
-    CATEGORY = "WaveSpeedAI"
-
-    def generate(self,
-                 client,
-                 model,
-                 prompt,
-                 negative_prompt="",
-                 size="",
-                 loras=None,
-                 num_inference_steps=30,
-                 guidance_scale=5.0,
-                 seed=-1,
-                 enable_safety_checker=True):
-        """
-        Generate video from text prompt
-
-        Args:
-            client: WaveSpeed AI API client
-            model: Model name
-            prompt: Text prompt to guide video generation
-            negative_prompt: Negative prompt to specify what to avoid in the video
-            size: Video dimensions in width*height format
-            loras: List of LoRA models to apply (max 3)
-            num_inference_steps: Number of inference steps
-            guidance_scale: Guidance scale for generation
-            seed: Random seed for reproducible results. -1 for random seed
-            enable_safety_checker: Enable safety checker for generated content
-
-        Returns:
-            tuple: (video_url,)
-        """
-        if size == "None":
-            size = None
-        try:
-            response = client.wan_text_to_video(
-                model=model,
-                prompt=prompt,
-                negative_prompt=negative_prompt,
-                loras=loras,
-                size=size,
-                num_inference_steps=num_inference_steps,
-                guidance_scale=guidance_scale,
-                seed=seed,
-                enable_safety_checker=enable_safety_checker,
-                wait_for_completion=True
-            )
-
-            video_url = response.get("video_url", "")
-
-            return (video_url,)
-        except Exception as e:
-            print(f"Generation failed: {str(e)}")
-            raise e
-
-class WanImage2VideoNode:
-    """
-    Wan Image to Video Node
-
-    This node uses WaveSpeed AI's Wan I2V model to generate videos from image.
-    """
-
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "client": ("WAVESPEED_AI_API_CLIENT",),
-                "model": (["wan-2.1/i2v-720p", "wan-2.1/i2v-480p","wan-2.1/i2v-720p-ultra-fast", "wan-2.1/i2v-480p-ultra-fast"],),
-                "image_url": ("STRING", {"multiline": False, "default": "", "tooltip": "Image URL for video generation"}),
-                "prompt": ("STRING", {"multiline": True, "default": "", "tooltip": "Text prompt to guide video generation"}),
-            },
-            "optional": {
-                "negative_prompt": ("STRING", {"multiline": True, "default": "", "tooltip": "Negative prompt to specify what to avoid in the video"}),
-                "size": (["None","720*1280", "1280*720", "480*832", "832*480"], {"tooltip": "Video dimensions in width x height format. 480p: 832*480 or 480*832, 720p: 1280*720 or 720*1280"}),
-                "loras": ("WAVESPEED_WAN_LORAS", {"tooltip": "List of LoRA models to apply (maximum 3)"}),
-                "num_inference_steps": ("INT", {
-                    "default": 30,
-                    "min": 1,
-                    "max": 40,
-                    "step": 1,
-                    "display": "number",
-                    "tooltip": "Number of inference steps"
-                }),
-                "guidance_scale": ("FLOAT", {
-                    "default": 5.0,
-                    "min": 0.0,
-                    "max": 10.0,
-                    "step": 0.1,
-                    "display": "number",
-                    "tooltip": "Guidance scale for generation"
-                }),
-                "seed": ("INT", {
-                    "default": -1,
-                    "min": -1,
-                    "max": 0xffffffffffffffff,
-                    "control_after_generate": True,
-                    "tooltip": "Random seed for reproducible results. -1 for random seed"
-                }),
-                "enable_safety_checker": ("BOOLEAN", {"default": True, "tooltip": "Enable safety checker for generated content"}),
-            }
-        }
-
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("url",)
-
-    FUNCTION = "generate"
-
-    CATEGORY = "WaveSpeedAI"
-
-    def generate(self,
-                 client,
-                 model,
-                 image_url,
-                 prompt,
-                 negative_prompt="",
-                 size="",
-                 loras=None,
-                 num_inference_steps=30,
-                 guidance_scale=5.0,
-                 seed=-1,
-                 enable_safety_checker=True):
-        """
-        Generate video from image and text prompt
-
-        Args:
-            client: WaveSpeed AI API client
-            model: Model name
-            image_url: Input image
-            prompt: Text prompt to guide video generation
-            negative_prompt: Negative prompt to specify what to avoid in the video
-            size: Video dimensions in width*height format
-            loras: List of LoRA models to apply (max 3)
-            num_inference_steps: Number of inference steps
-            guidance_scale: Guidance scale for generation
-            seed: Random seed for reproducible results. -1 for random seed
-            enable_safety_checker: Enable safety checker for generated content
-
-        Returns:
-            tuple: (video_url,)
-        """
-        try:
-            if size == "None":
-                size = None
-            response = client.wan_image_to_video(
-                model=model,
-                image=image_url,
-                prompt=prompt,
-                negative_prompt=negative_prompt,
-                loras=loras,
-                size=size,
-                num_inference_steps=num_inference_steps,
-                guidance_scale=guidance_scale,
-                seed=seed,
-                enable_safety_checker=enable_safety_checker,
-                wait_for_completion=True
-            )
-
-            video_url = response.get("video_url", "")
-
-            return (video_url,)
-        except Exception as e:
-            print(f"Generation failed: {str(e)}")
-            raise e
-
-
-class MinimaxImage2VideoNode:
-    """
-    Minimax Image to Video Node
-
-    This node uses Minimax AI's Image to Video model to generate videos from images.
-    """
-
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "client": ("WAVESPEED_AI_API_CLIENT",),
-                "model": (["minimax/video-01"],),
-                "first_frame_image": ("STRING", {"multiline": False, "default": "", "tooltip": "URL of the image to use as the first frame of the video"}),
-                "prompt": ("STRING", {"multiline": True, "default": "", "tooltip": "Text description of the video content to generate"}),
-            },
-            "optional": {
-                "prompt_optimizer": ("BOOLEAN", {"default": False, "tooltip": "Whether to automatically optimize the prompt for better results"}),
-                "subject_reference": ("STRING", {"multiline": False, "default": "", "tooltip": "URL of an image containing the subject to reference for consistent appearance"}),
-            }
-        }
-
-    RETURN_TYPES = ("STRING", "STRING")
-    RETURN_NAMES = ("video_url", "task_id")
-
-    FUNCTION = "generate"
-
-    CATEGORY = "MinimaxAI"
-
-    def generate(self,
-                 client,
-                 model,
-                 first_frame_image,
-                 prompt,
-                 prompt_optimizer=False,
-                 subject_reference=""):
-        """
-        Generate video from image and text prompt
-
-        Args:
-            client: Minimax AI API client
-            model: Model name
-            first_frame_image: URL of the image to use as the first frame of the video
-            prompt: Text description of the video content to generate
-            prompt_optimizer: Whether to automatically optimize the prompt for better results
-            subject_reference: URL of an image containing the subject to reference for consistent appearance
-
-        Returns:
-            tuple: (video_url, task_id)
-        """
-        try:
-            response = client.minimax_image_to_video(
-                model=model,
-                first_frame_image=first_frame_image,
-                prompt=prompt,
-                prompt_optimizer=prompt_optimizer,
-                subject_reference=subject_reference,
-                wait_for_completion=True
-            )
-
-            video_url = response.get("video_url", "")
-        
-            return (video_url,)
-        except Exception as e:
-            print(f"Generation failed: {str(e)}")
-            raise e
+NODE_DISPLAY_NAME_MAPPINGS = {
+    'WaveSpeedAI Client': 'WaveSpeedAI Client',
+    'WaveSpeedAI Wan Loras': 'WaveSpeedAI Wan Loras',
+    'WaveSpeedAI Flux Loras': 'WaveSpeedAI Flux and SDXL Loras',
+    'WaveSpeedAI Preview Video': 'WaveSpeedAI Preview Video',
+    'WaveSpeedAI Save Audio': 'WaveSpeedAI Save Audio',
+    'WaveSpeedAI Upload Image': 'WaveSpeedAI Upload Image',
+}
