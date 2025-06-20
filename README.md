@@ -35,8 +35,10 @@ The workflow images contain workflow information and can be directly dragged int
   ![Seedance Workflow](examples/bytedance_seedance_lite_i2v.png)
 
 - Result Video:
+  
+https://github.com/user-attachments/assets/b9902503-f8b1-46b2-bc8e-48fcba84e5bc
 
-  <video src="examples/bytedance_seedance_lite_i2v-480p.mp4" controls width="480"></video>
+---
 
 #### 1. Dia TTS
 - Workflow Example:
@@ -65,8 +67,8 @@ The workflow images contain workflow information and can be directly dragged int
   ![Hunyuan Custom Ref2V 720p Workflow](examples/hunyuan_custom_ref2v_720p.png)
 
 - Result Video:
-
-  <video src="examples/hunyuan_custom_ref2v_720p.mp4" controls width="480"></video>
+  
+https://github.com/user-attachments/assets/46220376-4341-4ce3-a7f4-46f12ff7ccf6
 
 ---
 
@@ -77,7 +79,7 @@ The workflow images contain workflow information and can be directly dragged int
 
 - Result Video:
 
-  <video src="examples/wan_2_1_i2v_720p_ultra_fast.mp4" controls width="480"></video>
+https://github.com/user-attachments/assets/77fc1882-6d74-43b0-a4eb-6d8883febcdc
 
 ---
 
