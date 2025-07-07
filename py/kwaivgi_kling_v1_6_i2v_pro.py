@@ -65,7 +65,7 @@ class KwaivgiKlingV16I2VProNode:
             end_image=end_image_url
         )
 
-        waveSpeedClient = WaveSpeedClient(client["api_key"]+"xxx")
+        waveSpeedClient = WaveSpeedClient(client["api_key"])
         response = waveSpeedClient.send_request(request, True, 3)
 
         video_url = response.get("outputs", [])
