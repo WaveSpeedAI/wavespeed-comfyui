@@ -297,23 +297,7 @@ class FluxLoras:
                     "max": 4.0,
                     "step": 0.05,
                     "display": "number"
-                }),
-                "lora4_path": ("STRING", {"multiline": False, "default": "", "tooltip": "LoRA model url ,like https://huggingface.co/username/model-name/blob/branch/model.safetensors"}),
-                "lora4_scale": ("FLOAT", {
-                    "default": 1.0,
-                    "min": 0.0,
-                    "max": 4.0,
-                    "step": 0.05,
-                    "display": "number"
-                }),
-                "lora5_path": ("STRING", {"multiline": False, "default": "", "tooltip": "LoRA model url ,like https://huggingface.co/username/model-name/blob/branch/model.safetensors"}),
-                "lora5_scale": ("FLOAT", {
-                    "default": 1.0,
-                    "min": 0.0,
-                    "max": 4.0,
-                    "step": 0.05,
-                    "display": "number"
-                }),
+                })
             }
         }
 
@@ -330,11 +314,7 @@ class FluxLoras:
                      lora2_path="",
                      lora2_scale=1.0,
                      lora3_path="",
-                     lora3_scale=1.0,
-                     lora4_path="",
-                     lora4_scale=1.0,
-                     lora5_path="",
-                     lora5_scale=1.0):
+                     lora3_scale=1.0,):
         """
         Create a list of LoRA parameters
 
@@ -358,9 +338,7 @@ class FluxLoras:
         # Add non-empty LoRA parameters
         for path, scale in [(lora1_path, lora1_scale),
                             (lora2_path, lora2_scale),
-                            (lora3_path, lora3_scale),
-                            (lora4_path, lora4_scale),
-                            (lora5_path, lora5_scale)]:
+                            (lora3_path, lora3_scale),]:
             if path.strip():
                 loras.append({"path": path.strip(), "scale": float(scale)})
 

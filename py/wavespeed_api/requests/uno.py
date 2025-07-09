@@ -9,7 +9,7 @@ class Uno(BaseRequest):
     An AI model that transforms input images into new ones based on text prompts, 
     blending reference visuals with your creative directions.
     """
-    images: List[str] = Field(..., description="URL of images to use while generating the image.", max_items=5)
+    images: List[str] = Field(..., description="URL of images to use while generating the image.", max_items=3)
     prompt: str = Field(..., description="The prompt to generate an image from.")
     image_size: Optional[str] = Field("square_hd", description="The aspect ratio of the generated image.", enum=["square_hd", "square", "portrait_4_3", "portrait_16_9", "landscape_4_3", "landscape_16_9"])
     seed: Optional[int] = Field(-1, description="Random seed for reproducible generation. If set none, a random seed will be used.")

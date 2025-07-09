@@ -23,7 +23,7 @@ class FluxDevLoraUltraFast(BaseRequest):
     image: Optional[str] = Field(default=None, description="Input image for image-to-image generation. Publicly accessible URL.")
     mask_image: Optional[str] = Field(default=None, description="The mask image tells the model where to generate new pixels (white) and where to preserve the original image (black). Publicly accessible URL.")
     strength: Optional[float] = Field(default=0.8, description="Strength indicates extent to transform the reference image (for image-to-image)", ge=0.01, le=1.0)
-    loras: Optional[List[LoraWeightItem]] = Field(None, description="List of LoRAs to apply (max 5)", max_items=5)
+    loras: Optional[List[LoraWeightItem]] = Field(None, description="List of LoRAs to apply (max 3)", max_items=3)
     width: Optional[int] = Field(default=1024, description="The width of the generated image.", ge=512, le=1536)
     height: Optional[int] = Field(default=1024, description="The height of the generated image.", ge=512, le=1536)
     num_inference_steps: Optional[int] = Field(default=28, description="Number of inference steps", ge=1, le=50)

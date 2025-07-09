@@ -14,7 +14,7 @@ class FluxDevLora(BaseRequest):
     enable_safety_checker: Optional[bool] = Field(default=True, description="Enable safety checker", disabled=True)
     guidance_scale: Optional[float] = Field(default=3.5, description="Guidance scale for generation", maximum=10, minimum=0)
     image: Optional[str] = Field(default=None, description="Input image for image-to-image generation.")
-    loras: Optional[List[LoraWeightItem]] = Field(None, description="List of LoRAs to apply (max 5)", max_items=5)
+    loras: Optional[List[LoraWeightItem]] = Field(None, description="List of LoRAs to apply (max 3)", max_items=3)
     mask_image: Optional[str] = Field(default=None, description="The mask image tells the model where to generate new pixels (white) and where to preserve the original image (black). It acts as a stencil or guide for targeted image editing.")
     num_images: Optional[int] = Field(default=1, description="Number of images to generate", maximum=4, minimum=1)
     num_inference_steps: Optional[int] = Field(default=28, description="Number of inference steps", maximum=50, minimum=1)

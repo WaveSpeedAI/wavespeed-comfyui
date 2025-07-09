@@ -18,7 +18,7 @@ class FluxSchnellLora(BaseRequest):
     mask_image: Optional[str] = Field(
         None, description="The mask image tells the model where to generate new pixels (white) and where to preserve the original image (black). It acts as a stencil or guide for targeted image editing.")
     strength: Optional[float] = Field(0.8, description="Strength indicates extent to transform the reference image")
-    loras: Optional[List[LoraWeightItem]] = Field(None, description="List of LoRAs to apply (max 5)", max_items=5)
+    loras: Optional[List[LoraWeightItem]] = Field(None, description="List of LoRAs to apply (max 3)", max_items=3)
     width: Optional[int] = Field(1024, description="Output image width", ge=512, le=1536)
     height: Optional[int] = Field(1024, description="Output image height", ge=512, le=1536)
     num_inference_steps: Optional[int] = Field(4, description="Number of inference steps")

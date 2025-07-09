@@ -20,7 +20,7 @@ class FluxDevFill(BaseRequest):
     seed: Optional[int] = Field(default=-1, description=" The same seed and the same prompt given to the same version of the model will output the same image every time. ")
     guidance_scale: Optional[float] = Field(default=30, description=" The CFG (Classifier Free Guidance) scale is a measure of how close you want the model to stick to your prompt when looking for a related image to show you. ")
     num_images: Optional[int] = Field(default=1, description="The number of images to generate.")
-    loras: Optional[List[LoraWeightItem]] = Field(None, description="List of LoRAs to apply (max 5)", max_items=5)
+    loras: Optional[List[LoraWeightItem]] = Field(None, description="List of LoRAs to apply (max 3)", max_items=3)
     enable_safety_checker: Optional[bool] = Field(default=True, description="If set to true, the safety checker will be enabled.")
     width: Optional[int] = Field(default=864, description="The width of the generated image.", ge=512, le=1536)
     height: Optional[int] = Field(default=1536, description="The height of the generated image.", ge=512, le=1536)

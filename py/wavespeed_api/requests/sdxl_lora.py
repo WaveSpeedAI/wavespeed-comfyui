@@ -20,7 +20,7 @@ class SdxlLora(BaseRequest):
     mask_image: Optional[str] = Field(
         default=None, description="The mask image tells the model where to generate new pixels (white) and where to preserve the original image (black). It acts as a stencil or guide for targeted image editing.")
     strength: Optional[float] = Field(default=0.8, ge=0.01, le=1.0, step=0.01, description="Strength indicates extent to transform the reference image")
-    loras: Optional[List[LoraWeightItem]] = Field(None, description="List of LoRAs to apply (max 5)", max_items=5)
+    loras: Optional[List[LoraWeightItem]] = Field(None, description="List of LoRAs to apply (max 3)", max_items=3)
     width: Optional[int] = Field(default=1024, description="Output image width", ge=512, le=1536)
     height: Optional[int] = Field(default=1024, description="Output image height", ge=512, le=1536)
     num_inference_steps: Optional[int] = Field(default=30, ge=1, le=50, description="Number of inference steps")

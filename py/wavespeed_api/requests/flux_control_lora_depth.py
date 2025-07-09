@@ -24,7 +24,7 @@ class FluxControlLoraDepth(BaseRequest):
     enable_safety_checker: Optional[bool] = Field(default=True, description="If set to true, the safety checker will be enabled.")
     guidance_scale: Optional[float] = Field(
         default=3.5, description="The CFG (Classifier Free Guidance) scale is a measure of how close you want the model to stick to your prompt when looking for a related image to show you", maximum=30, minimum=1)
-    loras: Optional[List[LoraWeightItem]] = Field(None, description="List of LoRAs to apply (max 5)", max_items=5)
+    loras: Optional[List[LoraWeightItem]] = Field(None, description="List of LoRAs to apply (max 3)", max_items=3)
     num_images: Optional[int] = Field(default=1, description="The number of images to generate", maximum=4, minimum=1)
     num_inference_steps: Optional[int] = Field(default=28, description="The number of inference steps to perform.", maximum=50, minimum=1)
     prompt: str = Field(..., description="The prompt to generate an image from.")  # '...' indicates required
