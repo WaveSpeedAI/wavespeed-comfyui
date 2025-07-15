@@ -49,8 +49,8 @@ class WaveSpeedClient:
             error_message = f"Error: {response.status_code}"
             try:
                 error_data = response.json()
-                if "error" in error_data:
-                    error_message = f"Error: {error_data['error']}"
+                if "message" in error_data:
+                    error_message = f"Error: {error_data['message']}"
             except:
                 pass
             raise Exception(error_message)
@@ -163,7 +163,6 @@ class WaveSpeedClient:
         payload["enable_base64_output"] = False
         if "seed" in payload:
             payload["seed"] = payload["seed"] % 9999999999 if payload["seed"] != -1 else -1
-
         response = self.post(request.get_api_path(), payload)
         request_id = response.get("id")
         if not request_id:

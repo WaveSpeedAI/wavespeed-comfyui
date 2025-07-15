@@ -1,0 +1,263 @@
+{
+  "id": "36cf237e-b8a4-429e-bf6f-edf252efa11d",
+  "revision": 0,
+  "last_node_id": 29,
+  "last_link_id": 42,
+  "nodes": [
+    {
+      "id": 12,
+      "type": "LoadImage",
+      "pos": [
+        -343.32781982421875,
+        2.9193222522735596
+      ],
+      "size": [
+        274.080078125,
+        314
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            30
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "---.png",
+        "image"
+      ]
+    },
+    {
+      "id": 28,
+      "type": "WaveSpeedAI Preview Video",
+      "pos": [
+        665.1029052734375,
+        -140.30813598632812
+      ],
+      "size": [
+        282.0025329589844,
+        82
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "video_url",
+          "type": "STRING",
+          "widget": {
+            "name": "video_url"
+          },
+          "link": 42
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "WaveSpeedAI Preview Video"
+      },
+      "widgets_values": [
+        "",
+        "wavespeed_video"
+      ]
+    },
+    {
+      "id": 1,
+      "type": "WaveSpeedAI Client",
+      "pos": [
+        -345.9893798828125,
+        -133.24803161621094
+      ],
+      "size": [
+        270,
+        58
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "client",
+          "type": "WAVESPEED_AI_API_CLIENT",
+          "links": [
+            12,
+            40
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "WaveSpeedAI Client"
+      },
+      "widgets_values": [
+        ""
+      ]
+    },
+    {
+      "id": 13,
+      "type": "WaveSpeedAI Upload Image",
+      "pos": [
+        -54.460533142089844,
+        17.26516342163086
+      ],
+      "size": [
+        219.93124389648438,
+        46
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "client",
+          "type": "WAVESPEED_AI_API_CLIENT",
+          "link": 12
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 30
+        }
+      ],
+      "outputs": [
+        {
+          "name": "first_image_url",
+          "type": "STRING",
+          "links": [
+            41
+          ]
+        },
+        {
+          "name": "image_urls",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "WaveSpeedAI Upload Image"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 29,
+      "type": "WaveSpeedAI KwaivgiKlingV21I2vStandardNode",
+      "pos": [
+        196.51742553710938,
+        -127.96833801269531
+      ],
+      "size": [
+        400,
+        214
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "client",
+          "type": "WAVESPEED_AI_API_CLIENT",
+          "link": 40
+        },
+        {
+          "name": "image",
+          "type": "STRING",
+          "widget": {
+            "name": "image"
+          },
+          "link": 41
+        }
+      ],
+      "outputs": [
+        {
+          "name": "video_url",
+          "type": "STRING",
+          "links": [
+            42
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "WaveSpeedAI KwaivgiKlingV21I2vStandardNode"
+      },
+      "widgets_values": [
+        "",
+        "The robot went on a rampage, smashing everything around it.",
+        "",
+        5,
+        0.5
+      ]
+    }
+  ],
+  "links": [
+    [
+      12,
+      1,
+      0,
+      13,
+      0,
+      "WAVESPEED_AI_API_CLIENT"
+    ],
+    [
+      30,
+      12,
+      0,
+      13,
+      1,
+      "IMAGE"
+    ],
+    [
+      40,
+      1,
+      0,
+      29,
+      0,
+      "WAVESPEED_AI_API_CLIENT"
+    ],
+    [
+      41,
+      13,
+      0,
+      29,
+      1,
+      "STRING"
+    ],
+    [
+      42,
+      29,
+      0,
+      28,
+      0,
+      "STRING"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.8712546788995775,
+      "offset": [
+        435.1049517309114,
+        314.0554173859501
+      ]
+    },
+    "frontendVersion": "1.20.7",
+    "VHS_latentpreview": false,
+    "VHS_latentpreviewrate": 0,
+    "VHS_MetadataImage": true,
+    "VHS_KeepIntermediate": true
+  },
+  "version": 0.4
+}
