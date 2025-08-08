@@ -50,7 +50,7 @@ class FluxControlLoraCanny(BaseRequest):
 
     def get_api_path(self):
         """Gets the API path for the request. Corresponds to api_path in the interface configuration json"""
-        return "/api/v2/wavespeed-ai/flux-control-lora-canny"
+        return "/api/v3/wavespeed-ai/flux-control-lora-canny"
 
     def field_required(self):
         return ["prompt"]

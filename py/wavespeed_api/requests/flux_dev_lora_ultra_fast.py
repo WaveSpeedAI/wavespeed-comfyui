@@ -59,7 +59,7 @@ class FluxDevLoraUltraFast(BaseRequest):
 
     def get_api_path(self):
         """Gets the API path. Corresponds to api_path in the JSON."""
-        return "/api/v2/wavespeed-ai/flux-dev-lora-ultra-fast"  # From api_schema.api_schemas[0].api_path
+        return "/api/v3/wavespeed-ai/flux-dev-lora-ultra-fast"  # From api_schema.api_schemas[0].api_path
 
     def field_required(self):
         """Corresponds to request_schema.required in the JSON."""

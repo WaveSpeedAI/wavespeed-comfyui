@@ -58,7 +58,7 @@ class Sdxl(BaseRequest):
 
     def get_api_path(self) -> str:
         """Gets the API path for the request. Corresponds to api_path in the interface configuration json"""
-        return "/api/v2/wavespeed-ai/sdxl"
+        return "/api/v3/wavespeed-ai/sdxl"
 
     def field_required(self) -> List[str]:
         """Corresponds to required in the interface configuration json"""

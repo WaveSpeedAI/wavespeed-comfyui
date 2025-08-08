@@ -200,3 +200,35 @@ class WaveSpeedClient:
                 raise Exception(f"API Error: {response_data.get('message', 'Unknown error')}")
             return response_data.get('data', {})["download_url"]
         raise Exception("No download URL in response")
+
+
+    def upload_file_with_type(self, file_path: str, file_type: str):
+        """
+        Upload a video to WaveSpeed AI API
+
+        Args:
+            video_path (str): Path to the video to be uploaded
+        """
+        url = f"{self.BASE_URL}/api/v2/media/upload/binary"
+        with open(file_path, "rb") as file:
+            file_name = ""
+            if "video" in file_type:
+               file_name = "video.mp4"
+            elif "image" in file_type:
+                file_name = "image.png"
+            elif "audio" in file_type:
+                file_name = "audio.mp3"
+            else:
+                raise Exception("Invalid file type")
+            files = {'file': (file_name, file, file_type)}
+            response = requests.post(url, headers={'Authorization': f'Bearer {self.api_key}'}, files=files)
+
+        if response.status_code != 200:
+            raise Exception(f"Upload failed: {response.status_code}")
+
+        response_data = response.json()
+        if isinstance(response_data, dict) and 'code' in response_data:
+            if response_data['code'] != 200:
+                raise Exception(f"API Error: {response_data.get('message', 'Unknown error')}")
+            return response_data.get('data', {})["download_url"]
+        raise Exception("No download URL in response")

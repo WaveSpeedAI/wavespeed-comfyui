@@ -32,7 +32,7 @@ class Hunyuan3DV2MultiView(BaseRequest):
 
     def get_api_path(self):
         """Gets the API path for the request. Corresponds to api_path in the interface configuration json"""
-        return "/api/v2/wavespeed-ai/hunyuan3d-v2-multi-view"
+        return "/api/v3/wavespeed-ai/hunyuan3d-v2-multi-view"
 
     def field_required(self):
         return ["back_image_url", "front_image_url", "left_image_url"]

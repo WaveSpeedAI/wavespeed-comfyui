@@ -36,7 +36,7 @@ class Magi124b(BaseRequest):
 
     def get_api_path(self):
         """Gets the API path for the request. Corresponds to api_path in the interface configuration json"""
-        return "/api/v2/wavespeed-ai/magi-1-24b"
+        return "/api/v3/wavespeed-ai/magi-1-24b"
 
     def field_required(self) -> List[str]:
         """Corresponds to required in the interface configuration json"""

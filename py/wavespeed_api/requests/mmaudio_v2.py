@@ -33,7 +33,7 @@ class MmaudioV2(BaseRequest):
 
     def get_api_path(self):
         """Gets the API path for the request. Corresponds to api_path in the interface configuration json"""
-        return "/api/v2/wavespeed-ai/mmaudio-v2"
+        return "/api/v3/wavespeed-ai/mmaudio-v2"
 
     def field_required(self):
         return ['video', 'prompt']

@@ -32,7 +32,7 @@ class ViduStartEndToVideo20(BaseRequest):
 
     def get_api_path(self):
         """Gets the API path for the request. Corresponds to api_path in the interface configuration json"""
-        return "/api/v2/vidu/start-end-to-video-2.0"
+        return "/api/v3/vidu/start-end-to-video-2.0"
 
     def field_required(self):
         return [

@@ -27,7 +27,7 @@ class LtxVideoV097I2V480p(BaseRequest):
 
     def get_api_path(self):
         """Gets the API path for the request. Corresponds to api_path in the interface configuration json"""
-        return "/api/v2/wavespeed-ai/ltx-video-v097/i2v-480p"
+        return "/api/v3/wavespeed-ai/ltx-video-v097/i2v-480p"
 
     def field_required(self):
         """Corresponds to required in the interface configuration json"""

@@ -53,7 +53,7 @@ class Wan21I2v720pLora(BaseRequest):
 
     def get_api_path(self):
         """Gets the API path for the request. Corresponds to api_path in the interface configuration json"""
-        return "/api/v2/wavespeed-ai/wan-2.1/i2v-720p-lora"
+        return "/api/v3/wavespeed-ai/wan-2.1/i2v-720p-lora"
 
     def field_required(self):
         return ["prompt", "image"]

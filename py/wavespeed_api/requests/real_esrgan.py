@@ -22,7 +22,7 @@ class RealEsrgan(BaseRequest):
 
     def get_api_path(self) -> str:
         """Gets the API path for the request. Corresponds to api_path in the interface configuration json"""
-        return "/api/v2/wavespeed-ai/real-esrgan"
+        return "/api/v3/wavespeed-ai/real-esrgan"
 
     def field_required(self) -> list[str]:
         """Corresponds to required in the interface configuration json"""

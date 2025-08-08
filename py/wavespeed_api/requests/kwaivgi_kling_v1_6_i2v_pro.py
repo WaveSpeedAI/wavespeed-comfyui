@@ -40,7 +40,7 @@ class KwaivgiKlingV1x6I2VPro(BaseRequest):
 
     def get_api_path(self) -> str:
         """Gets the API path for the request. Corresponds to api_path in the interface configuration json"""
-        return "/api/v2/kwaivgi/kling-v1.6-i2v-pro"
+        return "/api/v3/kwaivgi/kling-v1.6-i2v-pro"
 
     def field_required(self) -> List[str]:
         """Corresponds to required in the interface configuration json"""

@@ -5,11 +5,16 @@ import folder_paths
 import time
 import torchaudio
 from .wavespeed_api.client import WaveSpeedClient
-from .wavespeed_api.utils import tensor2images
+from .wavespeed_api.utils import tensor2images,save_audio,save_video
+from comfy.comfy_types import IO, FileLocator, ComfyNodeABC
+from comfy_api.input import ImageInput, AudioInput, VideoInput
 
 try:
     current_dir = os.path.dirname(os.path.abspath(__file__))
     parent_dir = os.path.dirname(current_dir)
+    temp_dir = os.path.join(parent_dir, '.temp')
+    if not os.path.exists(temp_dir):
+        os.makedirs(temp_dir)
     config_path = os.path.join(parent_dir, 'config.ini')
     config = configparser.ConfigParser()
 
@@ -380,6 +385,71 @@ class UploadImage:
             image_url = real_client.upload_file(image)
             image_urls.append(image_url)
         return (image_urls[0], image_urls,)
+    
+
+class UploadVideo:
+    """
+    Upload a file to WaveSpeed AI API
+
+    Args:
+        file_path (str): Path to the file to be uploaded
+
+    Returns:
+        dict: API response containing the uploaded file information
+    """
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "client": ("WAVESPEED_AI_API_CLIENT",),
+                "video": (IO.VIDEO,)
+            }
+        }
+
+    DESCRIPTION = "Upload a video to WaveSpeed AI API. The link will expire soon, please do not rely on this link."
+
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("video_url",)
+
+    CATEGORY = "WaveSpeedAI"
+    FUNCTION = "upload_file"
+
+    def upload_file(self, client, video:VideoInput):
+        save_path = os.path.join(temp_dir, f"{int(time.time())}.mp4")
+        save_video(video, save_path)
+        real_client = WaveSpeedClient(api_key=client["api_key"])
+        video_url = real_client.upload_file_with_type(save_path, "video/mp4")
+        os.remove(save_path)
+        return (video_url,)
+    
+class UploadAudio:
+    """
+    Upload a file to WaveSpeed AI API
+    """
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "client": ("WAVESPEED_AI_API_CLIENT",),
+                "audio": (IO.AUDIO,)
+            }
+        }
+
+    DESCRIPTION = "Upload an audio to WaveSpeed AI API. The link will expire soon, please do not rely on this link."
+
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("audio_url",)
+
+    CATEGORY = "WaveSpeedAI"
+    FUNCTION = "upload_file"
+
+    def upload_file(self, client, audio:AudioInput):
+        save_path = os.path.join(temp_dir, f"{int(time.time())}.mp3")
+        save_audio(audio, save_path)
+        real_client = WaveSpeedClient(api_key=client["api_key"])
+        audio_url = real_client.upload_file_with_type(save_path, "audio/mp3")
+        os.remove(save_path)
+        return (audio_url,)
 
 NODE_CLASS_MAPPINGS = {
     'WaveSpeedAI Client': WaveSpeedAIAPIClient,
@@ -388,6 +458,8 @@ NODE_CLASS_MAPPINGS = {
     'WaveSpeedAI Preview Video': PreviewVideo,
     'WaveSpeedAI Save Audio': SaveAudio,
     'WaveSpeedAI Upload Image': UploadImage,
+    'WaveSpeedAI Upload Video': UploadVideo,
+    'WaveSpeedAI Upload Audio': UploadAudio,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -397,4 +469,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     'WaveSpeedAI Preview Video': 'WaveSpeedAI Preview Video',
     'WaveSpeedAI Save Audio': 'WaveSpeedAI Save Audio',
     'WaveSpeedAI Upload Image': 'WaveSpeedAI Upload Image',
+    'WaveSpeedAI Upload Video': 'WaveSpeedAI Upload Video',
+    'WaveSpeedAI Upload Audio': 'WaveSpeedAI Upload Audio',
 }

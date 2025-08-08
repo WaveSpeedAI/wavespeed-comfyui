@@ -27,7 +27,7 @@ class HidreamI1Full(BaseRequest):
 
     def get_api_path(self) -> str:
         """Gets the API path for the request. Corresponds to api_path in the interface configuration json"""
-        return "/api/v2/wavespeed-ai/hidream-i1-full"
+        return "/api/v3/wavespeed-ai/hidream-i1-full"
 
     def field_required(self) -> list[str]:
         """Corresponds to required in the interface configuration json"""

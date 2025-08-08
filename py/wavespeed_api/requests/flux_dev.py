@@ -41,7 +41,7 @@ class FluxDev(BaseRequest):
 
     def get_api_path(self):
         """Gets the API path. Corresponds to api_path in the JSON."""
-        return "/api/v2/wavespeed-ai/flux-dev"
+        return "/api/v3/wavespeed-ai/flux-dev"
 
     def field_required(self):
         return ["prompt"]

@@ -36,7 +36,7 @@ class FluxReduxDev(BaseRequest):
 
     def get_api_path(self):
         """Gets the API path. Corresponds to api_path in the JSON."""
-        return "/api/v2/wavespeed-ai/flux-redux-dev"
+        return "/api/v3/wavespeed-ai/flux-redux-dev"
 
     def field_required(self):
         return ["image"]

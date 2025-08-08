@@ -30,7 +30,7 @@ class ViduImageToVideo2x0(BaseRequest):
 
     def get_api_path(self) -> str:
         """Gets the API path for the request. Corresponds to api_path in the interface configuration json"""
-        return "/api/v2/vidu/image-to-video-2.0"
+        return "/api/v3/vidu/image-to-video-2.0"
 
     def field_required(self) -> List[str]:
         """Corresponds to required in the interface configuration json"""

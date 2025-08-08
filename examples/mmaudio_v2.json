@@ -1,0 +1,257 @@
+{
+  "id": "36cf237e-b8a4-429e-bf6f-edf252efa11d",
+  "revision": 0,
+  "last_node_id": 49,
+  "last_link_id": 63,
+  "nodes": [
+    {
+      "id": 44,
+      "type": "LoadVideo",
+      "pos": [
+        -474.1702575683594,
+        346.15130615234375
+      ],
+      "size": [
+        378.080078125,
+        353.87994384765625
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VIDEO",
+          "type": "VIDEO",
+          "links": [
+            59
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadVideo"
+      },
+      "widgets_values": [
+        "b010e19a-20b2-4d07-a95e-295fbe73a8bd.mp4",
+        "image"
+      ]
+    },
+    {
+      "id": 45,
+      "type": "WaveSpeedAI Upload Video",
+      "pos": [
+        -91.2293701171875,
+        170.1464080810547
+      ],
+      "size": [
+        216.57479858398438,
+        46
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "client",
+          "type": "WAVESPEED_AI_API_CLIENT",
+          "link": 58
+        },
+        {
+          "name": "video",
+          "type": "VIDEO",
+          "link": 59
+        }
+      ],
+      "outputs": [
+        {
+          "name": "video_url",
+          "type": "STRING",
+          "links": [
+            61
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "WaveSpeedAI Upload Video"
+      }
+    },
+    {
+      "id": 46,
+      "type": "WaveSpeedAI Client",
+      "pos": [
+        -478.8438720703125,
+        169.01348876953125
+      ],
+      "size": [
+        270,
+        58
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "client",
+          "type": "WAVESPEED_AI_API_CLIENT",
+          "links": [
+            58,
+            62
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "WaveSpeedAI Client"
+      },
+      "widgets_values": [
+        ""
+      ]
+    },
+    {
+      "id": 48,
+      "type": "WaveSpeedAI MMAudioV2Node",
+      "pos": [
+        180.02552795410156,
+        156.9430694580078
+      ],
+      "size": [
+        400,
+        310
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "client",
+          "type": "WAVESPEED_AI_API_CLIENT",
+          "link": 62
+        },
+        {
+          "name": "video",
+          "type": "STRING",
+          "widget": {
+            "name": "video"
+          },
+          "link": 61
+        }
+      ],
+      "outputs": [
+        {
+          "name": "video_url",
+          "type": "STRING",
+          "links": [
+            63
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "WaveSpeedAI MMAudioV2Node"
+      },
+      "widgets_values": [
+        "",
+        "The camera drifts slowly backward, revealing a sun-drenched sanctuary suspended high above the urban sprawl. Morning light pours through floor-to-ceiling glass, casting a soft, warm glow across a serene palette of cream, beige, and champagne. The gentle pull-back catches the subtle sheen of satin bedding and the plush, inviting texture of the upholstered headboard. The angle subtly shifts, tracing the clean lines from the minimalist nightstand to the sculptural brass chandelier hanging like a delicate mobile in the still air. Tall, elegant mirrors amplify the light and the tranquil vista, creating an illusion of infinite space. The soundscape is one of serene quiet, the visual equivalent of a soft hum. The pacing is unhurried, offering a hypnotic immersion into a world of quiet luxury and effortless calm.",
+        "",
+        8,
+        517252343921657,
+        "randomize",
+        25,
+        4.5,
+        false
+      ]
+    },
+    {
+      "id": 49,
+      "type": "WaveSpeedAI Preview Video",
+      "pos": [
+        665.9052734375,
+        142.01763916015625
+      ],
+      "size": [
+        768,
+        768
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "video_url",
+          "type": "STRING",
+          "widget": {
+            "name": "video_url"
+          },
+          "link": 63
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "WaveSpeedAI Preview Video"
+      },
+      "widgets_values": [
+        "",
+        "wavespeed_video",
+        ""
+      ]
+    }
+  ],
+  "links": [
+    [
+      58,
+      46,
+      0,
+      45,
+      0,
+      "WAVESPEED_AI_API_CLIENT"
+    ],
+    [
+      59,
+      44,
+      0,
+      45,
+      1,
+      "VIDEO"
+    ],
+    [
+      61,
+      45,
+      0,
+      48,
+      1,
+      "STRING"
+    ],
+    [
+      62,
+      46,
+      0,
+      48,
+      0,
+      "WAVESPEED_AI_API_CLIENT"
+    ],
+    [
+      63,
+      48,
+      0,
+      49,
+      0,
+      "STRING"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.6545865356120055,
+      "offset": [
+        562.6458980777071,
+        86.13853809504967
+      ]
+    },
+    "frontendVersion": "1.20.7",
+    "VHS_latentpreview": false,
+    "VHS_latentpreviewrate": 0,
+    "VHS_MetadataImage": true,
+    "VHS_KeepIntermediate": true
+  },
+  "version": 0.4
+}

@@ -26,7 +26,7 @@ class KwaivgiKlingV1x6T2vStandard(BaseRequest):
 
     def get_api_path(self):
         """Gets the API path for the request. Corresponds to api_path in the interface configuration json"""
-        return "/api/v2/kwaivgi/kling-v1.6-t2v-standard"
+        return "/api/v3/kwaivgi/kling-v1.6-t2v-standard"
 
     def field_required(self):
         return ['prompt']

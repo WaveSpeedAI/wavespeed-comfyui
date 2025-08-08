@@ -54,7 +54,7 @@ class FluxSchnellLora(BaseRequest):
 
     def get_api_path(self):
         """Gets the API path. Corresponds to api_path in the JSON."""
-        return "/api/v2/wavespeed-ai/flux-schnell-lora"
+        return "/api/v3/wavespeed-ai/flux-schnell-lora"
 
     def field_required(self):
         return ['prompt']

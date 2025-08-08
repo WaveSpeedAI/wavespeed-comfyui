@@ -35,7 +35,7 @@ class FluxSchnell(BaseRequest):
         return self._remove_empty_fields(payload)
 
     def get_api_path(self):
-        return "/api/v2/wavespeed-ai/flux-schnell"
+        return "/api/v3/wavespeed-ai/flux-schnell"
 
     def field_required(self):
         return ["prompt"]

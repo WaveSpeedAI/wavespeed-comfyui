@@ -23,7 +23,7 @@ class Ghibli(BaseRequest):
 
     def get_api_path(self) -> str:
         """Gets the API path for the request. Corresponds to api_path in the interface configuration json"""
-        return "/api/v2/wavespeed-ai/ghibli"
+        return "/api/v3/wavespeed-ai/ghibli"
 
     def field_required(self) -> list[str]:
         """Corresponds to required fields in the interface configuration json"""

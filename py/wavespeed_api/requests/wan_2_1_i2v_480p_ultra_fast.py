@@ -41,7 +41,7 @@ class Wan21I2v480pUltraFast(BaseRequest):
 
     def get_api_path(self):
         """Gets the API path for the request. Corresponds to api_path in the interface configuration json"""
-        return "/api/v2/wavespeed-ai/wan-2.1/i2v-480p-ultra-fast"
+        return "/api/v3/wavespeed-ai/wan-2.1/i2v-480p-ultra-fast"
 
     def field_required(self) -> List[str]:
         """Corresponds to required in the interface configuration json"""
