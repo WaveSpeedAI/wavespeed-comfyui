@@ -1,6 +1,10 @@
 # ComfyUI-WaveSpeedAI-API
 
-This is a custom node for ComfyUI that allows you to use the WaveSpeed AI API directly in ComfyUI. WaveSpeed AI is a high-performance AI image and video generation service platform offering industry-leading generation speeds. For more information, see [WaveSpeed AI Documentation](https://wavespeed.ai/docs).
+This is a custom node for ComfyUI that allows you to use the WaveSpeed AI API directly in ComfyUI. WaveSpeed AI is a high-performance AI image and video generation service platform offering industry-leading generation speeds.
+
+**NEW: Dynamic Node Approach [WIP]** - We've introduced a streamlined workflow using dynamic nodes that replace the previous extensive collection of individual model nodes. You can now select models and configure parameters dynamically using **WaveSpeedAI Task Create [WIP] ➜ WaveSpeedAI Task Submit [WIP]** workflow for a more flexible and maintainable experience.
+
+For more information, see [WaveSpeed AI Documentation](https://wavespeed.ai/docs).
 
 ## Requirements
 Before using this node, you need to have a WaveSpeed AI API key. You can obtain your API key from the [WaveSpeed AI](https://wavespeed.ai).
@@ -28,7 +32,23 @@ The workflow images contain workflow information and can be directly dragged int
 
 ---
 
-#### Hot 
+#### NEW: Dynamic Node Examples [WIP]
+
+##### 1. Dynamic Nodes - Nano Banana
+- Workflow Example: [dynamic-nodes-nano-banana.json](examples/dynamic-nodes-nano-banana.json)
+- This example demonstrates the new dynamic node approach using nano banana model with WaveSpeedAI Task Create [WIP] ➜ WaveSpeedAI Task Submit [WIP] workflow.
+
+##### 2. Dynamic Nodes - Seedream V4
+- Workflow Example: [dynamic-nodes-seedreamv4.json](examples/dynamic-nodes-seedreamv4.json)
+- This example shows how to use Seedream V4 model through the dynamic node system.
+
+##### 3. Dynamic Nodes - Seedream V4 Sequential
+- Workflow Example: [dynamic-nodes-seedreamv4-sequential.json](examples/dynamic-nodes-seedreamv4-sequential.json)
+- This example demonstrates sequential processing with Seedream V4 using the dynamic node workflow.
+
+---
+
+#### Hot
 - We have launched very powerful video nodes called seedance, please enjoy them freely
 - Workflow Example:
 
@@ -84,12 +104,34 @@ https://github.com/user-attachments/assets/77fc1882-6d74-43b0-a4eb-6d8883febcdc
 ---
 
 
-### Here are some popular models you can experience in ComfyUI:
-1. Hunyuan Custom
-2. Ghibli
-3. Wan2.1
+### New Recommended Approach: Dynamic Parameter Nodes [WIP]
 
-### Here are some nodes list
+We now recommend using our new dynamic node system for a cleaner and more flexible workflow:
+
+#### Core Dynamic Nodes:
+* **WaveSpeedAI Task Create [WIP]** - Select any available model and configure parameters dynamically
+* **WaveSpeedAI Task Submit [WIP]** - Execute your configured task
+* **WaveSpeedAI Client** - Client configuration (still required)
+
+#### Workflow Benefits:
+- **Dynamic Model Selection**: Choose from all available models within a single node interface
+- **Dynamic Parameters**: Configure model-specific parameters without needing individual nodes
+- **Simplified Setup**: Cleaner workflows with fewer node types
+- **Future-Proof**: New models are automatically available without requiring new node releases
+
+#### How to Use:
+1. Add **WaveSpeedAI Task Create [WIP]** to your workflow
+2. Select your desired model from the dropdown (Flux, Hunyuan, Wan2.1, etc.)
+3. Configure the dynamic parameters based on your selected model
+4. Connect to **WaveSpeedAI Task Submit [WIP]** to execute
+
+#### Legacy Individual Model Nodes:
+While we still support the individual model nodes listed below, we recommend migrating to the dynamic approach for new workflows. If you encounter any issues with the new dynamic nodes, please submit an issue.
+
+<details>
+<summary>Click to view legacy individual model nodes</summary>
+
+### Legacy Nodes List (Still Supported):
 * "WaveSpeedAI Client"
 * "WaveSpeedAI Dia TTS"
 * "WaveSpeedAI Flux Control LoRA Canny"
@@ -151,6 +193,10 @@ https://github.com/user-attachments/assets/77fc1882-6d74-43b0-a4eb-6d8883febcdc
 * "WaveSpeedAI Wan2.1 T2V 720p LoRA"
 * "WaveSpeedAI Wan2.1 T2V 720p LoRA Ultra Fast"
 * "WaveSpeedAI Wan2.1 T2V 720p Ultra Fast"
+
+</details>
+
+---
 
 ### How to Apply Lora
 1. As we provide services on WaveSpeedAI-API, you cannot use your local lora files. However, we support loading lora via URL.

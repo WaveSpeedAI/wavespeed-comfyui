@@ -1,5 +1,7 @@
 import time
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from .utils import BaseRequest
 import PIL.Image
 import io
@@ -27,6 +29,27 @@ class WaveSpeedClient:
 
         self.headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
+        # Create session with connection pooling and retry strategy
+        self.session = requests.Session()
+
+        # Configure retry strategy
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=1,
+            status_forcelist=[429, 500, 502, 503, 504],
+            connect=3,  # Retry connection failures
+        )
+
+        # Configure adapter with timeouts
+        adapter = HTTPAdapter(
+            max_retries=retry_strategy,
+            pool_connections=10,
+            pool_maxsize=20
+        )
+
+        self.session.mount("http://", adapter)
+        self.session.mount("https://", adapter)
+
     def post(self, endpoint, payload, timeout=30):
         """
         Send POST request to WaveSpeed AI API
@@ -40,7 +63,12 @@ class WaveSpeedClient:
             dict: API response
         """
         url = f"{self.BASE_URL}{endpoint}"
-        response = requests.post(url, headers=self.headers, json=payload, timeout=timeout)
+        # Use tuple for timeout: (connect_timeout, read_timeout)
+        connect_timeout = min(10, timeout)  # Max 10s for connection
+        read_timeout = timeout
+        timeout_tuple = (connect_timeout, read_timeout)
+
+        response = self.session.post(url, headers=self.headers, json=payload, timeout=timeout_tuple)
 
         if response.status_code == 401:
             raise Exception("Unauthorized: Invalid API key")
@@ -77,7 +105,12 @@ class WaveSpeedClient:
             dict: API response
         """
         url = f"{self.BASE_URL}{endpoint}"
-        response = requests.get(url, headers=self.headers, params=params, timeout=timeout)
+        # Use tuple for timeout: (connect_timeout, read_timeout)
+        connect_timeout = min(10, timeout)  # Max 10s for connection
+        read_timeout = timeout
+        timeout_tuple = (connect_timeout, read_timeout)
+
+        response = self.session.get(url, headers=self.headers, params=params, timeout=timeout_tuple)
 
         if response.status_code != 200:
             error_message = f"Error: {response.status_code}"
@@ -189,7 +222,9 @@ class WaveSpeedClient:
         image.save(buffered, format="PNG")
         buffered.seek(0)
         files = {'file': ('image.png', buffered, 'image/png')}
-        response = requests.post(url, headers={'Authorization': f'Bearer {self.api_key}'}, files=files)
+        # Set timeout for file uploads: (connect_timeout, read_timeout)
+        timeout_tuple = (10, 120)  # 10s connect, 120s read for uploads
+        response = self.session.post(url, headers={'Authorization': f'Bearer {self.api_key}'}, files=files, timeout=timeout_tuple)
 
         if response.status_code != 200:
             raise Exception(f"Upload failed: {response.status_code}")
@@ -221,7 +256,9 @@ class WaveSpeedClient:
             else:
                 raise Exception("Invalid file type")
             files = {'file': (file_name, file, file_type)}
-            response = requests.post(url, headers={'Authorization': f'Bearer {self.api_key}'}, files=files)
+            # Set timeout for file uploads: (connect_timeout, read_timeout)
+            timeout_tuple = (10, 120)  # 10s connect, 120s read for uploads
+            response = self.session.post(url, headers={'Authorization': f'Bearer {self.api_key}'}, files=files, timeout=timeout_tuple)
 
         if response.status_code != 200:
             raise Exception(f"Upload failed: {response.status_code}")

@@ -6,8 +6,9 @@ import time
 import torchaudio
 from .wavespeed_api.client import WaveSpeedClient
 from .wavespeed_api.utils import tensor2images,save_audio,save_video
-from comfy.comfy_types import IO, FileLocator, ComfyNodeABC
-from comfy_api.input import ImageInput, AudioInput, VideoInput
+from .wavespeed_task_nodes import WaveSpeedTaskCreateDynamic, WaveSpeedTaskSubmit, WaveSpeedTaskStatus
+from comfy.comfy_types import IO
+from comfy_api.input import AudioInput, VideoInput
 
 try:
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -117,7 +118,7 @@ class SaveAudio:
         else:
             file_extension = file_extension.lower()
 
-        full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(save_file_prefix, folder_paths.get_output_directory())
+        full_output_folder, filename, counter, _, _ = folder_paths.get_save_image_path(save_file_prefix, folder_paths.get_output_directory())
 
         file = f"{filename}_{counter:05}_{file_extension}"
         file_path = os.path.join(full_output_folder, file)
@@ -460,6 +461,9 @@ NODE_CLASS_MAPPINGS = {
     'WaveSpeedAI Upload Image': UploadImage,
     'WaveSpeedAI Upload Video': UploadVideo,
     'WaveSpeedAI Upload Audio': UploadAudio,
+    'WaveSpeedAI Task Create': WaveSpeedTaskCreateDynamic,
+    'WaveSpeedAI Task Submit': WaveSpeedTaskSubmit,
+    'WaveSpeedAI Task Status': WaveSpeedTaskStatus,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -471,4 +475,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     'WaveSpeedAI Upload Image': 'WaveSpeedAI Upload Image',
     'WaveSpeedAI Upload Video': 'WaveSpeedAI Upload Video',
     'WaveSpeedAI Upload Audio': 'WaveSpeedAI Upload Audio',
+    'WaveSpeedAI Task Create': 'WaveSpeedAI Task Create [WIP]',
+    'WaveSpeedAI Task Submit': 'WaveSpeedAI Task Submit [WIP]',
+    'WaveSpeedAI Task Status': 'WaveSpeedAI Task Status [WIP]',
 }
