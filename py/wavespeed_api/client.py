@@ -50,7 +50,7 @@ class WaveSpeedClient:
         self.session.mount("http://", adapter)
         self.session.mount("https://", adapter)
 
-    def post(self, endpoint, payload, timeout=30):
+    def post(self, endpoint, payload, timeout=60):
         """
         Send POST request to WaveSpeed AI API
 
@@ -64,7 +64,7 @@ class WaveSpeedClient:
         """
         url = f"{self.BASE_URL}{endpoint}"
         # Use tuple for timeout: (connect_timeout, read_timeout)
-        connect_timeout = min(10, timeout)  # Max 10s for connection
+        connect_timeout = min(15, timeout / 4)  # Up to 15s for connection, or 1/4 of total timeout
         read_timeout = timeout
         timeout_tuple = (connect_timeout, read_timeout)
 
@@ -106,7 +106,7 @@ class WaveSpeedClient:
         """
         url = f"{self.BASE_URL}{endpoint}"
         # Use tuple for timeout: (connect_timeout, read_timeout)
-        connect_timeout = min(10, timeout)  # Max 10s for connection
+        connect_timeout = min(10, timeout / 3)  # Up to 10s for connection, or 1/3 of total timeout
         read_timeout = timeout
         timeout_tuple = (connect_timeout, read_timeout)
 
@@ -141,7 +141,8 @@ class WaveSpeedClient:
         """
         if not request_id:
             raise Exception("No valid task ID provided")
-        return self.get(f"/api/v2/predictions/{request_id}/result")
+        # Use 30s timeout for status checks - these should be quick
+        return self.get(f"/api/v2/predictions/{request_id}/result", timeout=30)
 
     def wait_for_task(self, request_id, polling_interval=5, timeout=None):
         """
@@ -196,7 +197,11 @@ class WaveSpeedClient:
         payload["enable_base64_output"] = False
         if "seed" in payload:
             payload["seed"] = payload["seed"] % 9999999999 if payload["seed"] != -1 else -1
-        response = self.post(request.get_api_path(), payload)
+
+        # Use appropriate timeout for initial request submission
+        initial_timeout = 60  # 60s for initial request submission
+        response = self.post(request.get_api_path(), payload, timeout=initial_timeout)
+
         request_id = response.get("id")
         if not request_id:
             raise Exception("No request ID in response")
@@ -223,7 +228,7 @@ class WaveSpeedClient:
         buffered.seek(0)
         files = {'file': ('image.png', buffered, 'image/png')}
         # Set timeout for file uploads: (connect_timeout, read_timeout)
-        timeout_tuple = (10, 120)  # 10s connect, 120s read for uploads
+        timeout_tuple = (15, 180)  # 15s connect, 180s read for uploads
         response = self.session.post(url, headers={'Authorization': f'Bearer {self.api_key}'}, files=files, timeout=timeout_tuple)
 
         if response.status_code != 200:
@@ -257,7 +262,7 @@ class WaveSpeedClient:
                 raise Exception("Invalid file type")
             files = {'file': (file_name, file, file_type)}
             # Set timeout for file uploads: (connect_timeout, read_timeout)
-            timeout_tuple = (10, 120)  # 10s connect, 120s read for uploads
+            timeout_tuple = (15, 180)  # 15s connect, 180s read for uploads
             response = self.session.post(url, headers={'Authorization': f'Bearer {self.api_key}'}, files=files, timeout=timeout_tuple)
 
         if response.status_code != 200:

@@ -87,6 +87,23 @@ async function getCachedModelDetail(modelId) {
     return GLOBAL_CACHE.modelDetails[modelId];
 }
 
+// Check if a property is a LoraWeight type
+function isLoraWeightType(prop) {
+    if (!prop) return false;
+
+    // Case 1: Direct LoraWeight reference
+    if (prop['$ref'] === '#/components/schemas/LoraWeight') {
+        return true;
+    }
+
+    // Case 2: Array of LoraWeight
+    if (prop.type === 'array' && prop.items && prop.items['$ref'] === '#/components/schemas/LoraWeight') {
+        return true;
+    }
+
+    return false;
+}
+
 // Parse model parameters (supports standard JSON Schema format)
 function parseModelParameters(inputSchema) {
     if (!inputSchema?.properties) {
@@ -114,6 +131,21 @@ function parseModelParameters(inputSchema) {
             isArray: prop.type === 'array',
             arrayItems: prop.items,
         };
+
+        // Special handling for LoraWeight detection
+        if (isLoraWeightType(prop)) {
+            param.type = "LORA_WEIGHT";
+            param.isLoraWeight = true;
+            param.isLoraArray = prop.type === 'array';
+            console.log(`[WaveSpeed] Detected LoraWeight parameter: ${propName}`, {
+                isArray: param.isLoraArray,
+                originalType: prop.type,
+                hasItems: !!prop.items,
+                itemsRef: prop.items ? prop.items['$ref'] : null,
+                directRef: prop['$ref'],
+                schema: prop
+            });
+        }
 
         // Handle enum types
         if (prop.enum && prop.enum.length > 0) {
@@ -171,7 +203,7 @@ function mapJsonSchemaType(prop, propName = '') {
         'number': 'FLOAT',
         'integer': 'INT',
         'boolean': 'BOOLEAN',
-        'array': 'STRING',  // Handle arrays as comma-separated strings in UI
+        'array': 'STRING',  // Handle arrays as comma-separated strings in UI by default
         'object': 'DICT'
     };
 
@@ -180,7 +212,7 @@ function mapJsonSchemaType(prop, propName = '') {
 
 // Determine if a parameter needs an input port
 function shouldCreateInputPort(param) {
-    const supportedInputTypes = ['STRING', 'INT', 'FLOAT', 'BOOLEAN'];
+    const supportedInputTypes = ['STRING', 'INT', 'FLOAT', 'BOOLEAN', 'LORA_WEIGHT'];
     return supportedInputTypes.includes(param.type);
 }
 
@@ -281,6 +313,13 @@ app.registerExtension({
                         widgetHeight = Math.max(80, lines * 22); // Increased minimum height and line height
                         widgetMargin = 12; // Extra margin for multiline widgets
                         console.log(`[WaveSpeed]   Widget "${widget.name}": multiline, ${lines} lines, height=${widgetHeight}px, y=${currentY}`);
+                    } else if (widget._wavespeed_is_lora_weight) {
+                        // Special handling for LoRA weight widgets (multiline)
+                        multilineWidgetCount++;
+                        const lines = Math.max((widget.value || "").split('\n').length, 4); // Default to 4 lines for LoRA
+                        widgetHeight = Math.max(100, lines * 22); // Minimum 100px for LoRA widgets
+                        widgetMargin = 15; // Extra margin for LoRA widgets
+                        console.log(`[WaveSpeed]   Widget "${widget.name}": LoRA weight, ${lines} lines, height=${widgetHeight}px, y=${currentY}`);
                     } else if (widget.type === "combo") {
                         widgetHeight = 32; // Slightly taller for combo boxes
                         console.log(`[WaveSpeed]   Widget "${widget.name}": combo, height=${widgetHeight}px, y=${currentY}`);
@@ -520,7 +559,7 @@ function setupDynamicInputHandling(node) {
             originalOnConnectionsChange.call(this, type, slotIndex, isConnected, linkInfo, ioSlot);
         }
 
-        // Handle dynamic input connections
+        // Handle dynamic input connections with improved sync
         if (type === LiteGraph.INPUT && ioSlot && ioSlot._wavespeed_dynamic) {
             const placeholderInput = ioSlot._wavespeed_placeholder_input;
             if (placeholderInput) {
@@ -545,7 +584,7 @@ function setupDynamicInputHandling(node) {
         if (this._wavespeed_allInputs && this._wavespeed_allInputs.length > 0) {
             if (!data.inputs) data.inputs = [];
 
-            // Make sure we capture all connections from both visible and hidden inputs
+            // Serialize connections from all inputs (visible and hidden)
             for (let i = 0; i < this._wavespeed_allInputs.length; i++) {
                 const input = this._wavespeed_allInputs[i];
                 if (input.link) {
@@ -1265,6 +1304,52 @@ function createParameterWidget(node, param, paramIndex) {
                 { values: param.options }
             );
         }
+        // LORA_WEIGHT type - creates special input for LoRA parameters
+        else if (param.type === "LORA_WEIGHT" || param.isLoraWeight) {
+            let placeholder, label;
+            if (param.isLoraArray) {
+                // Array of LoraWeight
+                placeholder = `[{"path": "lora1.safetensors", "scale": 1.0}, {"path": "lora2.safetensors", "scale": 0.8}]`;
+                label = displayName + " (JSON array or WAVESPEED_LORAS)";
+            } else {
+                // Single LoraWeight
+                placeholder = `{"path": "lora.safetensors", "scale": 1.0}`;
+                label = displayName + " (JSON object or single LORA)";
+            }
+
+            const comfyWidget = ComfyWidgets["STRING"](
+                node,
+                label,
+                ["STRING", { multiline: true, dynamicPrompts: true }],
+                app
+            );
+            widget = comfyWidget.widget;
+            widget.value = param.default || "";
+            widget.callback = (value) => {
+                node.wavespeedState.parameterValues[param.name] = value;
+                updateRequestJsonWidget(node);
+            };
+
+            // Add helper text for LoRA input format
+            if (widget.inputEl) {
+                widget.inputEl.placeholder = placeholder;
+                widget.inputEl.style.minHeight = "60px"; // Increased minimum height
+                widget.inputEl.style.maxHeight = "120px"; // Increased maximum height
+                widget.inputEl.style.resize = "vertical";
+
+                const tooltipText = param.isLoraArray
+                    ? "LoRA array format: JSON array with 'path' and 'scale' fields, or connect WAVESPEED_LORAS node"
+                    : "LoRA object format: JSON object with 'path' and 'scale' fields, or connect single LoRA";
+                widget.inputEl.title = tooltipText;
+            }
+
+            // Mark as LoRA weight widget for special processing
+            widget._wavespeed_is_lora_weight = true;
+            widget._wavespeed_is_lora_array = param.isLoraArray;
+
+            // Force the widget type to be recognized as multiline for height calculation
+            widget.type = "customtext"; // This ensures it's treated as multiline in size calculation
+        }
         // Numeric types
         else if (param.type === "INT" || param.type === "FLOAT") {
             const isFloat = param.type === "FLOAT";
@@ -1316,6 +1401,11 @@ function createParameterWidget(node, param, paramIndex) {
                 const updatedSize = node.computeSize();
                 node.setSize(updatedSize);
                 console.log(`[WaveSpeed] Updated node size after adding widget "${param.name}": [${updatedSize[0]}, ${updatedSize[1]}]`);
+
+                // Force canvas redraw for LoRA widgets to ensure proper positioning
+                if (widget._wavespeed_is_lora_weight && app.graph) {
+                    app.graph.setDirtyCanvas(true, true);
+                }
             }
         }, 10);
 
@@ -1383,9 +1473,17 @@ function createWidgetInputPort(node, widget, param) {
         }
 
         // Create a new visible input with the parameter name that redirects to the placeholder
+        let inputType = param.type;
+        if (param.type === 'LORA_WEIGHT') {
+            // Use WAVESPEED_LORAS type to allow connections from LoRA nodes
+            inputType = 'WAVESPEED_LORAS';
+        } else if (param.type === 'INT' || param.type === 'FLOAT') {
+            inputType = 'NUMBER';
+        }
+
         const paramInput = {
             name: param.name,
-            type: param.type === 'INT' || param.type === 'FLOAT' ? 'NUMBER' : param.type,
+            type: inputType,
             link: null,
             _wavespeed_dynamic: true,
             _wavespeed_param_name: param.name,
@@ -1398,8 +1496,17 @@ function createWidgetInputPort(node, widget, param) {
 
         // Use the node's own method to add the input safely
         if (node.addInput) {
+            // Determine the input type for LORA_WEIGHT parameters
+            let inputType = param.type;
+            if (param.type === 'LORA_WEIGHT') {
+                // Use WAVESPEED_LORAS type to allow connections from LoRA nodes
+                inputType = 'WAVESPEED_LORAS';
+            } else if (param.type === 'INT' || param.type === 'FLOAT') {
+                inputType = 'NUMBER';
+            }
+
             // Try to use ComfyUI's addInput method first
-            const addedInput = node.addInput(param.name, param.type === 'INT' || param.type === 'FLOAT' ? 'NUMBER' : param.type);
+            const addedInput = node.addInput(param.name, inputType);
             if (addedInput) {
                 // Copy our custom properties to the added input
                 Object.assign(addedInput, {
@@ -1413,7 +1520,7 @@ function createWidgetInputPort(node, widget, param) {
                 // Record the paired input port on the widget
                 widget._wavespeed_input_pair = addedInput;
 
-                console.log(`[WaveSpeed] Successfully created input using addInput for: ${param.name} -> ${placeholderName}`);
+                console.log(`[WaveSpeed] Successfully created input using addInput for: ${param.name} -> ${placeholderName} (type: ${inputType})`);
                 return addedInput;
             }
         }
@@ -1472,8 +1579,14 @@ function allocatePlaceholder(node, param) {
     // Determine parameter type
     let paramType = param.type?.toLowerCase() || 'string';
 
-    // Special handling for array parameters
-    if (param.isArray) {
+    // CRITICAL FIX: Check for LoRA weight parameters FIRST, before array processing
+    // This is because LoRA weight can be both array and special type
+    if (param.type === 'LORA_WEIGHT' || param.isLoraWeight) {
+        paramType = 'lora-weight';
+        console.log(`[WaveSpeed] Detected LoRA weight parameter: ${paramName} -> ${paramType}`);
+    }
+    // Only check array handling if not already identified as LoRA weight
+    else if (param.isArray) {
         const itemType = param.arrayItems?.type?.toLowerCase() || 'string';
         if (itemType === 'number' || itemType === 'integer' || itemType === 'float') {
             paramType = 'array-int';
@@ -1615,6 +1728,18 @@ function collectParameterValues(node) {
                 if (placeholderInfo && placeholderInfo.placeholder) {
                     connectedParams[paramName] = placeholderInfo;
                     console.log(`[WaveSpeed] Parameter ${paramName} connected via ${placeholderInfo.placeholder} (${placeholderInfo.type})`);
+
+                    // For LoRA weight connections, we can also try to get the current value for preview
+                    if (widget._wavespeed_is_lora_weight && pairedInput && pairedInput.link) {
+                        try {
+                            const inputData = node.getInputData(node.inputs.indexOf(pairedInput));
+                            if (inputData) {
+                                console.log(`[WaveSpeed] LoRA connection data preview for ${paramName}:`, inputData);
+                            }
+                        } catch (error) {
+                            console.log(`[WaveSpeed] Could not preview LoRA connection data for ${paramName}:`, error);
+                        }
+                    }
                 }
             } else {
                 // No input connection, use the widget's value
@@ -1641,6 +1766,70 @@ function collectParameterValues(node) {
                         } catch (error) {
                             console.warn(`[WaveSpeed] Failed to convert array parameter ${paramName}:`, error);
                         }
+                    }
+                    // Handle LoRA weight type conversion
+                    else if (widget._wavespeed_is_lora_weight && typeof value === 'string' && value.trim() !== '') {
+                        // Parse LoRA weight string into JSON structure for requestJson
+                        try {
+                            if (value.trim().startsWith('{') && value.trim().endsWith('}')) {
+                                // Single LoraWeight object
+                                const parsed = JSON.parse(value);
+                                if (typeof parsed === 'object' && parsed.path && parsed.scale !== undefined) {
+                                    value = parsed; // Use parsed object
+                                    console.log(`[WaveSpeed] Parsed single LoRA object for ${paramName}:`, value);
+                                } else {
+                                    console.warn(`[WaveSpeed] Invalid LoRA object format for ${paramName}:`, parsed);
+                                }
+                            } else if (value.trim().startsWith('[') && value.trim().endsWith(']')) {
+                                // Array of LoraWeight objects
+                                const parsed = JSON.parse(value);
+                                if (Array.isArray(parsed)) {
+                                    // Validate array items
+                                    const validItems = parsed.filter(item =>
+                                        typeof item === 'object' && item.path && item.scale !== undefined
+                                    );
+                                    if (validItems.length === parsed.length) {
+                                        value = parsed; // Use parsed array
+                                        console.log(`[WaveSpeed] Parsed LoRA array for ${paramName}:`, value);
+                                    } else {
+                                        console.warn(`[WaveSpeed] Some LoRA items invalid for ${paramName}:`, parsed);
+                                        value = validItems; // Use only valid items
+                                    }
+                                } else {
+                                    console.warn(`[WaveSpeed] Invalid LoRA array format for ${paramName}:`, parsed);
+                                }
+                            } else {
+                                // Handle comma-separated format: path1:scale1,path2:scale2
+                                const loras = [];
+                                const pairs = value.split(',').map(p => p.trim()).filter(p => p);
+                                for (const pair of pairs) {
+                                    if (pair.includes(':')) {
+                                        const [path, scaleStr] = pair.split(':', 2);
+                                        const scale = parseFloat(scaleStr.trim());
+                                        if (!isNaN(scale)) {
+                                            loras.push({
+                                                path: path.trim(),
+                                                scale: scale
+                                            });
+                                        }
+                                    } else {
+                                        // Default scale
+                                        loras.push({
+                                            path: pair.trim(),
+                                            scale: 1.0
+                                        });
+                                    }
+                                }
+                                if (loras.length > 0) {
+                                    value = widget._wavespeed_is_lora_array ? loras : loras[0];
+                                    console.log(`[WaveSpeed] Parsed comma-separated LoRA for ${paramName}:`, value);
+                                }
+                            }
+                        } catch (error) {
+                            console.warn(`[WaveSpeed] Failed to parse LoRA value for ${paramName}:`, error);
+                            // Keep original string value as fallback
+                        }
+                        console.log(`[WaveSpeed] Final LoRA value for ${paramName} (isArray: ${widget._wavespeed_is_lora_array}):`, value);
                     }
 
                     if (widget.type === "string" && typeof value === 'string' && value.trim() === '') {

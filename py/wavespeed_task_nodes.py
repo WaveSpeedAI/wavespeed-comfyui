@@ -16,7 +16,7 @@ def convert_parameter_value(value, param_type):
 
     Args:
         value: The input value from ComfyUI node connection
-        param_type: Type specification (string, number, array-str, array-int)
+        param_type: Type specification (string, number, array-str, array-int, lora-weight)
 
     Returns:
         Converted value appropriate for the API
@@ -66,6 +66,92 @@ def convert_parameter_value(value, param_type):
             except (ValueError, TypeError):
                 result = [str(value)]
         print(f"[WaveSpeed] array-int conversion result: {result}")
+        return result
+
+    elif param_type == "lora-weight":
+        # Convert LoraWeight type - supports WAVESPEED_LORAS input, JSON structures, and string formats
+
+        # Case 1: Already structured data (from frontend JSON parsing or WAVESPEED_LORAS)
+        if isinstance(value, dict):
+            # Single LoraWeight object - validate it has required fields
+            if 'path' in value and 'scale' in value:
+                result = value
+                print(f"[WaveSpeed] lora-weight (structured single object) conversion result: {result}")
+                return result
+            else:
+                print(f"[WaveSpeed] Invalid LoRA object, missing required fields: {value}")
+                result = {}
+        elif isinstance(value, list):
+            # Array of LoraWeight objects - validate each item
+            valid_loras = []
+            for item in value:
+                if isinstance(item, dict) and 'path' in item and 'scale' in item:
+                    valid_loras.append(item)
+                else:
+                    print(f"[WaveSpeed] Invalid LoRA item, skipping: {item}")
+            result = valid_loras
+            print(f"[WaveSpeed] lora-weight (structured array) conversion result: {result}")
+            return result
+        elif hasattr(value, '__iter__') and not isinstance(value, str):
+            # Handle other iterable inputs (WAVESPEED_LORAS fallback)
+            if len(value) > 0 and isinstance(value[0], dict) and 'path' in value[0] and 'scale' in value[0]:
+                result = list(value)
+                print(f"[WaveSpeed] lora-weight (WAVESPEED_LORAS) conversion result: {result}")
+                return result
+            result = list(value)
+        elif isinstance(value, str):
+            # Handle JSON string input (fallback for legacy or manual input)
+            if value.strip().startswith('{') and value.strip().endswith('}'):
+                # Single LoraWeight object
+                try:
+                    import json
+                    parsed = json.loads(value)
+                    if isinstance(parsed, dict):
+                        # Validate single LoRA object has required fields
+                        if 'path' not in parsed or 'scale' not in parsed:
+                            raise ValueError("LoRA object must have 'path' and 'scale' fields")
+                        result = parsed  # Return single object, not array
+                        print(f"[WaveSpeed] lora-weight (single JSON string) conversion result: {result}")
+                        return result
+                except (json.JSONDecodeError, ValueError) as e:
+                    print(f"[WaveSpeed] Failed to parse single LoRA JSON: {e}")
+                    result = {}
+            elif value.strip().startswith('[') and value.strip().endswith(']'):
+                # Array of LoraWeight objects
+                try:
+                    import json
+                    parsed = json.loads(value)
+                    if isinstance(parsed, list):
+                        # Validate each item has required fields
+                        for item in parsed:
+                            if not isinstance(item, dict) or 'path' not in item or 'scale' not in item:
+                                raise ValueError("Each LoRA item must have 'path' and 'scale' fields")
+                        result = parsed
+                        print(f"[WaveSpeed] lora-weight (JSON array string) conversion result: {result}")
+                        return result
+                except (json.JSONDecodeError, ValueError) as e:
+                    print(f"[WaveSpeed] Failed to parse LoRA JSON array: {e}")
+                    result = []
+            else:
+                # Handle comma-separated format: path1:scale1,path2:scale2
+                loras = []
+                if value.strip():
+                    pairs = [pair.strip() for pair in value.split(',') if pair.strip()]
+                    for pair in pairs:
+                        if ':' in pair:
+                            path, scale_str = pair.split(':', 1)
+                            try:
+                                scale = float(scale_str.strip())
+                                loras.append({"path": path.strip(), "scale": scale})
+                            except ValueError:
+                                print(f"[WaveSpeed] Invalid scale value in LoRA pair: {pair}")
+                        else:
+                            # Default scale if not specified
+                            loras.append({"path": pair.strip(), "scale": 1.0})
+                result = loras
+        else:
+            result = {}  # Default to empty object for single LoRA, empty list for array
+        print(f"[WaveSpeed] lora-weight conversion result: {result}")
         return result
 
     elif param_type == "number":

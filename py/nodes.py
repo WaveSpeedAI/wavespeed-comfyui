@@ -267,6 +267,85 @@ class WanLoras:
         return (loras,)
 
 
+class CustomLoras:
+    """
+    WaveSpeed AI LoRA Parameters Node
+
+    This node is used to set LoRA model parameters for use by other nodes.
+    """
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "lora1_path": ("STRING", {"multiline": False, "default": "", "tooltip": "LoRA model url ,like https://huggingface.co/username/model-name/blob/branch/model.safetensors"}),
+                "lora1_scale": ("FLOAT", {
+                    "default": 0.8,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 0.05,
+                    "display": "number"
+                }),
+            },
+            "optional": {
+                "lora2_path": ("STRING", {"multiline": False, "default": "", "tooltip": "LoRA model url ,like https://huggingface.co/username/model-name/blob/branch/model.safetensors"}),
+                "lora2_scale": ("FLOAT", {
+                    "default": 0.8,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 0.05,
+                    "display": "number"
+                }),
+                "lora3_path": ("STRING", {"multiline": False, "default": "", "tooltip": "LoRA model url ,like https://huggingface.co/username/model-name/blob/branch/model.safetensors"}),
+                "lora3_scale": ("FLOAT", {
+                    "default": 0.8,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 0.05,
+                    "display": "number"
+                }),
+            }
+        }
+
+    RETURN_TYPES = ("WAVESPEED_LORAS",)
+    RETURN_NAMES = ("loras",)
+
+    FUNCTION = "create_loras"
+
+    CATEGORY = "WaveSpeedAI"
+
+    def create_loras(self,
+                     lora1_path,
+                     lora1_scale,
+                     lora2_path="",
+                     lora2_scale=0.8,
+                     lora3_path="",
+                     lora3_scale=0.8):
+        """
+        Create a list of LoRA parameters
+
+        Args:
+            lora1_path: Path to the first LoRA model
+            lora1_scale: Weight of the first LoRA model
+            lora2_path: Path to the second LoRA model
+            lora2_scale: Weight of the second LoRA model
+            lora3_path: Path to the third LoRA model
+            lora3_scale: Weight of the third LoRA model
+        Returns:
+            list: List of LoRA parameters
+        """
+        loras = []
+
+        # Add non-empty LoRA parameters
+        for path, scale in [(lora1_path, lora1_scale),
+                            (lora2_path, lora2_scale),
+                            (lora3_path, lora3_scale)]:
+            if path.strip():
+                loras.append({"path": path.strip(), "scale": float(scale)})
+
+        return (loras,)
+
+
 class FluxLoras:
     """
     WaveSpeed AI LoRA Parameter Node
@@ -454,6 +533,7 @@ class UploadAudio:
 
 NODE_CLASS_MAPPINGS = {
     'WaveSpeedAI Client': WaveSpeedAIAPIClient,
+    'WaveSpeedAI Loras Config': CustomLoras,
     'WaveSpeedAI Wan Loras': WanLoras,
     'WaveSpeedAI Flux Loras': FluxLoras,
     'WaveSpeedAI Preview Video': PreviewVideo,
@@ -468,6 +548,7 @@ NODE_CLASS_MAPPINGS = {
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     'WaveSpeedAI Client': 'WaveSpeedAI Client',
+    'WaveSpeedAI Loras Config': 'WaveSpeedAI Loras Config',
     'WaveSpeedAI Wan Loras': 'WaveSpeedAI Wan Loras',
     'WaveSpeedAI Flux Loras': 'WaveSpeedAI Flux and SDXL Loras',
     'WaveSpeedAI Preview Video': 'WaveSpeedAI Preview Video',

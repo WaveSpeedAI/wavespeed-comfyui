@@ -46,6 +46,11 @@ The workflow images contain workflow information and can be directly dragged int
 - Workflow Example: [dynamic-nodes-seedreamv4-sequential.json](examples/dynamic-nodes-seedreamv4-sequential.json)
 - This example demonstrates sequential processing with Seedream V4 using the dynamic node workflow.
 
+##### 4. Dynamic Nodes - Qwen LoRA
+- Workflow Example: [dynamic-nodes-qwen-lora.json](examples/dynamic-nodes-qwen-lora.json)
+- This example demonstrates how to use the Qwen LoRA model with the dynamic node workflow.
+
+
 ---
 
 #### Hot

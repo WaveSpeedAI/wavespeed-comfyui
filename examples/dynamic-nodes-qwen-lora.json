@@ -1,0 +1,452 @@
+{
+  "id": "00000000-0000-0000-0000-000000000000",
+  "revision": 0,
+  "last_node_id": 7,
+  "last_link_id": 13,
+  "nodes": [
+    {
+      "id": 7,
+      "type": "WaveSpeedAI Task Create",
+      "pos": [
+        158.88815307617188,
+        1573.678955078125
+      ],
+      "size": [
+        245.57284545898438,
+        553
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "prompt",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "seed",
+          "type": "NUMBER",
+          "link": null
+        },
+        {
+          "name": "image",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "loras",
+          "type": "WAVESPEED_LORAS",
+          "link": 12
+        },
+        {
+          "name": "prompt",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "seed",
+          "type": "NUMBER",
+          "link": null
+        },
+        {
+          "name": "image",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "loras",
+          "type": "WAVESPEED_LORAS",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "task_info",
+          "type": "TASK_INFO",
+          "links": [
+            13
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "WaveSpeedAI Task Create"
+      },
+      "widgets_values": [
+        "Image to Image",
+        "wavespeed-ai/qwen-image/edit-lora",
+        "Change into a white shirt and a black coat.",
+        -1,
+        "",
+        "",
+        "https://d1q70pf5vjeyhc.cloudfront.net/media/fb8f674bbb1a429d947016fd223cfae1/images/1756276409257359694_TBVSQNJH.png",
+        "",
+        "jpeg"
+      ],
+      "_wavespeed_dynamic_state": {
+        "modelId": "wavespeed-ai/qwen-image/edit-lora",
+        "category": "Image to Image",
+        "parameters": [
+          {
+            "name": "prompt",
+            "displayName": "prompt",
+            "type": "STRING",
+            "required": true,
+            "description": "The prompt to generate an image from.",
+            "isArray": false
+          },
+          {
+            "name": "image",
+            "displayName": "image",
+            "type": "STRING",
+            "required": true,
+            "description": "The image to generate an image from.",
+            "isArray": false
+          },
+          {
+            "name": "loras",
+            "displayName": "loras",
+            "type": "LORA_WEIGHT",
+            "required": false,
+            "default": [],
+            "description": "List of LoRAs to apply (maximum 3).",
+            "isArray": true,
+            "arrayItems": {
+              "$ref": "#/components/schemas/LoraWeight"
+            },
+            "isLoraWeight": true,
+            "isLoraArray": true
+          },
+          {
+            "name": "seed",
+            "displayName": "seed",
+            "type": "INT",
+            "required": false,
+            "default": -1,
+            "description": "The random seed to use for the generation. -1 means a random seed will be used.",
+            "isArray": false,
+            "step": 1
+          },
+          {
+            "name": "output_format",
+            "displayName": "output_format",
+            "type": "COMBO",
+            "required": false,
+            "default": "jpeg",
+            "description": "The format of the output image.",
+            "isArray": false,
+            "options": [
+              "jpeg",
+              "png",
+              "webp"
+            ]
+          }
+        ],
+        "parameterValues": {
+          "prompt": "Change into a white shirt and a black coat.",
+          "image": "https://d1q70pf5vjeyhc.cloudfront.net/media/fb8f674bbb1a429d947016fd223cfae1/images/1756276409257359694_TBVSQNJH.png"
+        },
+        "paramMapping": {
+          "prompt": {
+            "placeholder": "param_1",
+            "type": "string",
+            "originalType": "STRING",
+            "isArray": false
+          },
+          "seed": {
+            "placeholder": "param_2",
+            "type": "int",
+            "originalType": "INT",
+            "isArray": false
+          },
+          "image": {
+            "placeholder": "param_3",
+            "type": "string",
+            "originalType": "STRING",
+            "isArray": false
+          },
+          "loras": {
+            "placeholder": "param_4",
+            "type": "lora-weight",
+            "originalType": "LORA_WEIGHT",
+            "isArray": true
+          }
+        }
+      },
+      "_wavespeed_model_cache": {
+        "modelId": "wavespeed-ai/qwen-image/edit-lora",
+        "category": "Image to Image",
+        "parameters": [
+          {
+            "name": "prompt",
+            "displayName": "prompt",
+            "type": "STRING",
+            "required": true,
+            "description": "The prompt to generate an image from.",
+            "isArray": false
+          },
+          {
+            "name": "image",
+            "displayName": "image",
+            "type": "STRING",
+            "required": true,
+            "description": "The image to generate an image from.",
+            "isArray": false
+          },
+          {
+            "name": "loras",
+            "displayName": "loras",
+            "type": "LORA_WEIGHT",
+            "required": false,
+            "default": [],
+            "description": "List of LoRAs to apply (maximum 3).",
+            "isArray": true,
+            "arrayItems": {
+              "$ref": "#/components/schemas/LoraWeight"
+            },
+            "isLoraWeight": true,
+            "isLoraArray": true
+          },
+          {
+            "name": "seed",
+            "displayName": "seed",
+            "type": "INT",
+            "required": false,
+            "default": -1,
+            "description": "The random seed to use for the generation. -1 means a random seed will be used.",
+            "isArray": false,
+            "step": 1
+          },
+          {
+            "name": "output_format",
+            "displayName": "output_format",
+            "type": "COMBO",
+            "required": false,
+            "default": "jpeg",
+            "description": "The format of the output image.",
+            "isArray": false,
+            "options": [
+              "jpeg",
+              "png",
+              "webp"
+            ]
+          }
+        ],
+        "parameterValues": {
+          "prompt": "Change into a white shirt and a black coat.",
+          "image": "https://d1q70pf5vjeyhc.cloudfront.net/media/fb8f674bbb1a429d947016fd223cfae1/images/1756276409257359694_TBVSQNJH.png"
+        },
+        "lastUpdated": 1758529174592
+      }
+    },
+    {
+      "id": 3,
+      "type": "WaveSpeedAI Loras Config",
+      "pos": [
+        -261.4742736816406,
+        1638.8702392578125
+      ],
+      "size": [
+        272.1451110839844,
+        178
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "loras",
+          "type": "WAVESPEED_LORAS",
+          "links": [
+            12
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "WaveSpeedAI Loras Config"
+      },
+      "widgets_values": [
+        "https://huggingface.co/flymy-ai/qwen-image-realism-lora/resolve/main/flymy_realism.safetensors",
+        1,
+        "",
+        0.8,
+        "",
+        0.8
+      ]
+    },
+    {
+      "id": 5,
+      "type": "WaveSpeedAI Client",
+      "pos": [
+        -255.88575744628906,
+        1500.6846923828125
+      ],
+      "size": [
+        270,
+        58
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "client",
+          "type": "WAVESPEED_AI_API_CLIENT",
+          "links": [
+            3
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "WaveSpeedAI Client"
+      },
+      "widgets_values": [
+        ""
+      ]
+    },
+    {
+      "id": 4,
+      "type": "WaveSpeedAI Task Submit",
+      "pos": [
+        498.3240051269531,
+        1483.1756591796875
+      ],
+      "size": [
+        307.1246032714844,
+        186
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "client",
+          "type": "WAVESPEED_AI_API_CLIENT",
+          "link": 3
+        },
+        {
+          "name": "task_info",
+          "type": "TASK_INFO",
+          "link": 13
+        }
+      ],
+      "outputs": [
+        {
+          "name": "task_id",
+          "type": "STRING",
+          "links": null
+        },
+        {
+          "name": "video_url",
+          "type": "STRING",
+          "links": null
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            5
+          ]
+        },
+        {
+          "name": "audio_url",
+          "type": "STRING",
+          "links": null
+        },
+        {
+          "name": "text",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "WaveSpeedAI Task Submit"
+      },
+      "widgets_values": [
+        true,
+        300,
+        5
+      ]
+    },
+    {
+      "id": 6,
+      "type": "PreviewImage",
+      "pos": [
+        897.3189086914062,
+        1479.560302734375
+      ],
+      "size": [
+        140,
+        246
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 5
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    }
+  ],
+  "links": [
+    [
+      3,
+      5,
+      0,
+      4,
+      0,
+      "WAVESPEED_AI_API_CLIENT"
+    ],
+    [
+      5,
+      4,
+      2,
+      6,
+      0,
+      "IMAGE"
+    ],
+    [
+      12,
+      3,
+      0,
+      7,
+      3,
+      "WAVESPEED_LORAS"
+    ],
+    [
+      13,
+      7,
+      0,
+      4,
+      1,
+      "TASK_INFO"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.9229599817706431,
+      "offset": [
+        343.75291474386586,
+        -1392.9121849132016
+      ]
+    },
+    "frontendVersion": "1.20.7",
+    "VHS_latentpreview": false,
+    "VHS_latentpreviewrate": 0,
+    "VHS_MetadataImage": true,
+    "VHS_KeepIntermediate": true
+  },
+  "version": 0.4
+}
