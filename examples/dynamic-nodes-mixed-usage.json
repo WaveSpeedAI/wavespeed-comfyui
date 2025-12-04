@@ -1,0 +1,1223 @@
+{
+  "id": "4ab72d3f-9018-461d-87d0-e71f9ccdcc5c",
+  "revision": 0,
+  "last_node_id": 35,
+  "last_link_id": 78,
+  "nodes": [
+    {
+      "id": 29,
+      "type": "LoadImage",
+      "pos": [
+        -1186.7415771484375,
+        2390.82958984375
+      ],
+      "size": [
+        274.080078125,
+        314.0001220703125
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            65
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "1745415734811161257_WMLHEAws.jpg",
+        "image"
+      ]
+    },
+    {
+      "id": 12,
+      "type": "LoadImage",
+      "pos": [
+        -1184.7939453125,
+        2017.26416015625
+      ],
+      "size": [
+        274.080078125,
+        314.0001220703125
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            22
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "---.png",
+        "image"
+      ]
+    },
+    {
+      "id": 21,
+      "type": "WaveSpeedAI Upload Image",
+      "pos": [
+        -853.5018920898438,
+        1828.4969482421875
+      ],
+      "size": [
+        219.93124389648438,
+        46
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "client",
+          "type": "WAVESPEED_AI_API_CLIENT",
+          "link": 23
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 22
+        }
+      ],
+      "outputs": [
+        {
+          "name": "first_image_url",
+          "type": "STRING",
+          "links": [
+            37,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47,
+            48,
+            49,
+            50,
+            51,
+            52,
+            53,
+            54,
+            55,
+            56,
+            57,
+            58,
+            59,
+            60,
+            63,
+            68,
+            76
+          ]
+        },
+        {
+          "name": "image_urls",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "WaveSpeedAI Upload Image"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 20,
+      "type": "WaveSpeedAI Client",
+      "pos": [
+        -1182.350830078125,
+        1822.5816650390625
+      ],
+      "size": [
+        270,
+        58
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "client",
+          "type": "WAVESPEED_AI_API_CLIENT",
+          "links": [
+            23,
+            64,
+            72,
+            75
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "WaveSpeedAI Client"
+      },
+      "widgets_values": [
+        ""
+      ]
+    },
+    {
+      "id": 30,
+      "type": "WaveSpeedAI Upload Image",
+      "pos": [
+        -848.285888671875,
+        1930.3330078125
+      ],
+      "size": [
+        219.93124389648438,
+        46
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "client",
+          "type": "WAVESPEED_AI_API_CLIENT",
+          "link": 64
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 65
+        }
+      ],
+      "outputs": [
+        {
+          "name": "first_image_url",
+          "type": "STRING",
+          "links": [
+            69
+          ]
+        },
+        {
+          "name": "image_urls",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "WaveSpeedAI Upload Image"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 31,
+      "type": "WaveSpeedAI Media Images To List",
+      "pos": [
+        -847.7623901367188,
+        2031.388671875
+      ],
+      "size": [
+        249.47616577148438,
+        198
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image_url_1",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "image_url_1"
+          },
+          "link": 68
+        },
+        {
+          "name": "image_url_2",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "image_url_2"
+          },
+          "link": 69
+        }
+      ],
+      "outputs": [
+        {
+          "name": "firstImageUrl",
+          "type": "STRING",
+          "links": null
+        },
+        {
+          "name": "imageUrls",
+          "type": "STRING",
+          "links": [
+            70
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "WaveSpeedAI Media Images To List"
+      },
+      "widgets_values": [
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ]
+    },
+    {
+      "id": 28,
+      "type": "WaveSpeedAI Task Create",
+      "pos": [
+        -530,
+        1990
+      ],
+      "size": [
+        245.57284545898438,
+        429
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "prompt",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "images",
+          "type": "STRING",
+          "link": 70
+        },
+        {
+          "name": "num_images",
+          "type": "NUMBER",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "task_info",
+          "type": "TASK_INFO",
+          "links": [
+            71
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "WaveSpeedAI Task Create"
+      },
+      "widgets_values": [
+        "Image to Image",
+        "kwaivgi/kling-image-o1",
+        "The woman in Figure 2 is replaced with the robot from Figure 1, and the robot enters a berserk state",
+        "",
+        1,
+        "4:3",
+        "1k"
+      ],
+      "_wavespeed_dynamic_state": {
+        "modelId": "kwaivgi/kling-image-o1",
+        "category": "Image to Image",
+        "parameters": [
+          {
+            "name": "prompt",
+            "displayName": "prompt",
+            "type": "STRING",
+            "required": true,
+            "description": "The positive prompt for the generation.",
+            "isArray": false
+          },
+          {
+            "name": "images",
+            "displayName": "images",
+            "type": "STRING",
+            "required": false,
+            "description": "Including reference images of the element, scene, style, etc.max 10",
+            "isArray": true,
+            "arrayItems": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "aspect_ratio",
+            "displayName": "aspect_ratio",
+            "type": "COMBO",
+            "required": false,
+            "default": "1:1",
+            "description": "The aspect ratio of the generated image.",
+            "isArray": false,
+            "options": [
+              "16:9",
+              "9:16",
+              "1:1",
+              "4:3",
+              "3:4",
+              "3:2",
+              "2:3",
+              "21:9",
+              "auto"
+            ]
+          },
+          {
+            "name": "resolution",
+            "displayName": "resolution",
+            "type": "COMBO",
+            "required": false,
+            "default": "1k",
+            "description": "Image generation resolution",
+            "isArray": false,
+            "options": [
+              "1k",
+              "2k"
+            ]
+          },
+          {
+            "name": "num_images",
+            "displayName": "num_images",
+            "type": "INT",
+            "required": false,
+            "default": "",
+            "description": "The number of images to generate.",
+            "isArray": false,
+            "min": 1,
+            "max": 9,
+            "step": 1
+          }
+        ],
+        "parameterValues": {
+          "prompt": "The woman in Figure 2 is replaced with the robot from Figure 1, and the robot enters a berserk state",
+          "aspect_ratio": "4:3",
+          "resolution": "1k",
+          "num_images": 1
+        },
+        "paramMapping": {
+          "prompt": {
+            "placeholder": "param_1",
+            "type": "string",
+            "originalType": "STRING",
+            "isArray": false
+          },
+          "images": {
+            "placeholder": "param_2",
+            "type": "array-str",
+            "originalType": "STRING",
+            "isArray": true,
+            "arrayItemType": "string"
+          },
+          "num_images": {
+            "placeholder": "param_3",
+            "type": "int",
+            "originalType": "INT",
+            "isArray": false
+          }
+        }
+      },
+      "_wavespeed_model_cache": {
+        "modelId": "kwaivgi/kling-image-o1",
+        "category": "Image to Image",
+        "parameters": [
+          {
+            "name": "prompt",
+            "displayName": "prompt",
+            "type": "STRING",
+            "required": true,
+            "description": "The positive prompt for the generation.",
+            "isArray": false
+          },
+          {
+            "name": "images",
+            "displayName": "images",
+            "type": "STRING",
+            "required": false,
+            "description": "Including reference images of the element, scene, style, etc.max 10",
+            "isArray": true,
+            "arrayItems": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "aspect_ratio",
+            "displayName": "aspect_ratio",
+            "type": "COMBO",
+            "required": false,
+            "default": "1:1",
+            "description": "The aspect ratio of the generated image.",
+            "isArray": false,
+            "options": [
+              "16:9",
+              "9:16",
+              "1:1",
+              "4:3",
+              "3:4",
+              "3:2",
+              "2:3",
+              "21:9",
+              "auto"
+            ]
+          },
+          {
+            "name": "resolution",
+            "displayName": "resolution",
+            "type": "COMBO",
+            "required": false,
+            "default": "1k",
+            "description": "Image generation resolution",
+            "isArray": false,
+            "options": [
+              "1k",
+              "2k"
+            ]
+          },
+          {
+            "name": "num_images",
+            "displayName": "num_images",
+            "type": "INT",
+            "required": false,
+            "default": "",
+            "description": "The number of images to generate.",
+            "isArray": false,
+            "min": 1,
+            "max": 9,
+            "step": 1
+          }
+        ],
+        "parameterValues": {
+          "prompt": "The woman in Figure 2 is replaced with the robot from Figure 1, and the robot enters a berserk state",
+          "aspect_ratio": "4:3",
+          "resolution": "1k",
+          "num_images": 1
+        },
+        "lastUpdated": 1764825116231
+      }
+    },
+    {
+      "id": 32,
+      "type": "WaveSpeedAI Task Submit",
+      "pos": [
+        -244.66812133789062,
+        1993.88232421875
+      ],
+      "size": [
+        307.1246032714844,
+        226
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "client",
+          "type": "WAVESPEED_AI_API_CLIENT",
+          "link": 72
+        },
+        {
+          "name": "task_info",
+          "type": "TASK_INFO",
+          "link": 71
+        }
+      ],
+      "outputs": [
+        {
+          "name": "task_id",
+          "type": "STRING",
+          "links": null
+        },
+        {
+          "name": "video_url",
+          "type": "STRING",
+          "links": null
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": null
+        },
+        {
+          "name": "audio_url",
+          "type": "STRING",
+          "links": null
+        },
+        {
+          "name": "text",
+          "type": "STRING",
+          "links": null
+        },
+        {
+          "name": "firstImageUrl",
+          "type": "STRING",
+          "links": [
+            77
+          ]
+        },
+        {
+          "name": "imageUrls",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "WaveSpeedAI Task Submit"
+      },
+      "widgets_values": [
+        true,
+        300,
+        5
+      ]
+    },
+    {
+      "id": 23,
+      "type": "WaveSpeedAI Task Create",
+      "pos": [
+        103.16377258300781,
+        1859.177734375
+      ],
+      "size": [
+        245.57284545898438,
+        481
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "prompt",
+          "type": "STRING",
+          "link": 63
+        },
+        {
+          "name": "image",
+          "type": "STRING",
+          "link": 76
+        },
+        {
+          "name": "last_image",
+          "type": "STRING",
+          "link": 77
+        }
+      ],
+      "outputs": [
+        {
+          "name": "task_info",
+          "type": "TASK_INFO",
+          "links": [
+            61
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "WaveSpeedAI Task Create"
+      },
+      "widgets_values": [
+        "Image to Video",
+        "kwaivgi/kling-video-o1/image-to-video",
+        "The robot activates the temporal entry to the world of No. 1 Player and begins to transform",
+        "",
+        "",
+        "16:9",
+        5
+      ],
+      "_wavespeed_dynamic_state": {
+        "modelId": "kwaivgi/kling-video-o1/image-to-video",
+        "category": "Image to Video",
+        "parameters": [
+          {
+            "name": "prompt",
+            "displayName": "prompt",
+            "type": "STRING",
+            "required": true,
+            "description": "The positive prompt for the generation.",
+            "isArray": false
+          },
+          {
+            "name": "image",
+            "displayName": "image",
+            "type": "STRING",
+            "required": true,
+            "description": "first_frame is the first frame",
+            "isArray": false
+          },
+          {
+            "name": "last_image",
+            "displayName": "last_image",
+            "type": "STRING",
+            "required": false,
+            "description": "last_frame is the last frame.",
+            "isArray": false
+          },
+          {
+            "name": "aspect_ratio",
+            "displayName": "aspect_ratio",
+            "type": "COMBO",
+            "required": false,
+            "default": "16:9",
+            "description": "The aspect ratio of the generated video.",
+            "isArray": false,
+            "options": [
+              "16:9",
+              "9:16",
+              "1:1"
+            ]
+          },
+          {
+            "name": "duration",
+            "displayName": "duration",
+            "type": "COMBO",
+            "required": false,
+            "default": 5,
+            "description": "The duration of the generated media in seconds.",
+            "isArray": false,
+            "options": [
+              5,
+              10
+            ],
+            "step": 1
+          }
+        ],
+        "parameterValues": {
+          "prompt": "The robot activates the temporal entry to the world of No. 1 Player and begins to transform",
+          "image": "",
+          "duration": 5
+        },
+        "paramMapping": {
+          "prompt": {
+            "placeholder": "param_1",
+            "type": "string",
+            "originalType": "STRING",
+            "isArray": false
+          },
+          "image": {
+            "placeholder": "param_2",
+            "type": "string",
+            "originalType": "STRING",
+            "isArray": false
+          },
+          "last_image": {
+            "placeholder": "param_3",
+            "type": "string",
+            "originalType": "STRING",
+            "isArray": false
+          }
+        }
+      },
+      "_wavespeed_model_cache": {
+        "modelId": "kwaivgi/kling-video-o1/image-to-video",
+        "category": "Image to Video",
+        "parameters": [
+          {
+            "name": "prompt",
+            "displayName": "prompt",
+            "type": "STRING",
+            "required": true,
+            "description": "The positive prompt for the generation.",
+            "isArray": false
+          },
+          {
+            "name": "image",
+            "displayName": "image",
+            "type": "STRING",
+            "required": true,
+            "description": "first_frame is the first frame",
+            "isArray": false
+          },
+          {
+            "name": "last_image",
+            "displayName": "last_image",
+            "type": "STRING",
+            "required": false,
+            "description": "last_frame is the last frame.",
+            "isArray": false
+          },
+          {
+            "name": "aspect_ratio",
+            "displayName": "aspect_ratio",
+            "type": "COMBO",
+            "required": false,
+            "default": "16:9",
+            "description": "The aspect ratio of the generated video.",
+            "isArray": false,
+            "options": [
+              "16:9",
+              "9:16",
+              "1:1"
+            ]
+          },
+          {
+            "name": "duration",
+            "displayName": "duration",
+            "type": "COMBO",
+            "required": false,
+            "default": 5,
+            "description": "The duration of the generated media in seconds.",
+            "isArray": false,
+            "options": [
+              5,
+              10
+            ],
+            "step": 1
+          }
+        ],
+        "parameterValues": {
+          "prompt": "The robot activates the temporal entry to the world of No. 1 Player and begins to transform",
+          "image": "",
+          "duration": 5
+        },
+        "lastUpdated": 1764825116232
+      }
+    },
+    {
+      "id": 25,
+      "type": "WaveSpeedAI Task Submit",
+      "pos": [
+        402.5138854980469,
+        1851.3609619140625
+      ],
+      "size": [
+        307.1246032714844,
+        226
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "client",
+          "type": "WAVESPEED_AI_API_CLIENT",
+          "link": 75
+        },
+        {
+          "name": "task_info",
+          "type": "TASK_INFO",
+          "link": 61
+        }
+      ],
+      "outputs": [
+        {
+          "name": "task_id",
+          "type": "STRING",
+          "links": null
+        },
+        {
+          "name": "video_url",
+          "type": "STRING",
+          "links": [
+            78
+          ]
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": null
+        },
+        {
+          "name": "audio_url",
+          "type": "STRING",
+          "links": null
+        },
+        {
+          "name": "text",
+          "type": "STRING",
+          "links": null
+        },
+        {
+          "name": "firstImageUrl",
+          "type": "STRING",
+          "links": null
+        },
+        {
+          "name": "imageUrls",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "WaveSpeedAI Task Submit"
+      },
+      "widgets_values": [
+        true,
+        300,
+        5
+      ]
+    },
+    {
+      "id": 35,
+      "type": "WaveSpeedAI Preview Video",
+      "pos": [
+        756.3582153320312,
+        1858.373779296875
+      ],
+      "size": [
+        768,
+        768
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "video_url",
+          "type": "STRING",
+          "widget": {
+            "name": "video_url"
+          },
+          "link": 78
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "WaveSpeedAI Preview Video"
+      },
+      "widgets_values": [
+        "",
+        "wavespeed_video",
+        ""
+      ]
+    }
+  ],
+  "links": [
+    [
+      22,
+      12,
+      0,
+      21,
+      1,
+      "IMAGE"
+    ],
+    [
+      23,
+      20,
+      0,
+      21,
+      0,
+      "WAVESPEED_AI_API_CLIENT"
+    ],
+    [
+      37,
+      21,
+      0,
+      23,
+      0,
+      "STRING"
+    ],
+    [
+      39,
+      21,
+      0,
+      23,
+      0,
+      "STRING"
+    ],
+    [
+      40,
+      21,
+      0,
+      23,
+      1,
+      "STRING"
+    ],
+    [
+      41,
+      21,
+      0,
+      23,
+      1,
+      "STRING"
+    ],
+    [
+      42,
+      21,
+      0,
+      23,
+      1,
+      "STRING"
+    ],
+    [
+      43,
+      21,
+      0,
+      23,
+      1,
+      "STRING"
+    ],
+    [
+      44,
+      21,
+      0,
+      23,
+      1,
+      "STRING"
+    ],
+    [
+      45,
+      21,
+      0,
+      23,
+      1,
+      "STRING"
+    ],
+    [
+      46,
+      21,
+      0,
+      23,
+      1,
+      "STRING"
+    ],
+    [
+      47,
+      21,
+      0,
+      23,
+      2,
+      "STRING"
+    ],
+    [
+      48,
+      21,
+      0,
+      23,
+      2,
+      "STRING"
+    ],
+    [
+      49,
+      21,
+      0,
+      23,
+      2,
+      "STRING"
+    ],
+    [
+      50,
+      21,
+      0,
+      23,
+      1,
+      "STRING"
+    ],
+    [
+      51,
+      21,
+      0,
+      23,
+      1,
+      "STRING"
+    ],
+    [
+      52,
+      21,
+      0,
+      23,
+      0,
+      "STRING"
+    ],
+    [
+      53,
+      21,
+      0,
+      23,
+      0,
+      "STRING"
+    ],
+    [
+      54,
+      21,
+      0,
+      23,
+      1,
+      "STRING"
+    ],
+    [
+      55,
+      21,
+      0,
+      23,
+      1,
+      "STRING"
+    ],
+    [
+      56,
+      21,
+      0,
+      23,
+      0,
+      "STRING"
+    ],
+    [
+      57,
+      21,
+      0,
+      23,
+      0,
+      "STRING"
+    ],
+    [
+      58,
+      21,
+      0,
+      23,
+      0,
+      "STRING"
+    ],
+    [
+      59,
+      21,
+      0,
+      23,
+      1,
+      "STRING"
+    ],
+    [
+      60,
+      21,
+      0,
+      23,
+      0,
+      "STRING"
+    ],
+    [
+      61,
+      23,
+      0,
+      25,
+      1,
+      "TASK_INFO"
+    ],
+    [
+      63,
+      21,
+      0,
+      23,
+      0,
+      "STRING"
+    ],
+    [
+      64,
+      20,
+      0,
+      30,
+      0,
+      "WAVESPEED_AI_API_CLIENT"
+    ],
+    [
+      65,
+      29,
+      0,
+      30,
+      1,
+      "IMAGE"
+    ],
+    [
+      68,
+      21,
+      0,
+      31,
+      0,
+      "STRING"
+    ],
+    [
+      69,
+      30,
+      0,
+      31,
+      1,
+      "STRING"
+    ],
+    [
+      70,
+      31,
+      1,
+      28,
+      1,
+      "STRING"
+    ],
+    [
+      71,
+      28,
+      0,
+      32,
+      1,
+      "TASK_INFO"
+    ],
+    [
+      72,
+      20,
+      0,
+      32,
+      0,
+      "WAVESPEED_AI_API_CLIENT"
+    ],
+    [
+      75,
+      20,
+      0,
+      25,
+      0,
+      "WAVESPEED_AI_API_CLIENT"
+    ],
+    [
+      76,
+      21,
+      0,
+      23,
+      1,
+      "STRING"
+    ],
+    [
+      77,
+      32,
+      5,
+      23,
+      2,
+      "STRING"
+    ],
+    [
+      78,
+      25,
+      1,
+      35,
+      0,
+      "STRING"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.9229599817706443,
+      "offset": [
+        -91.51013908046082,
+        -1585.9542762257322
+      ]
+    },
+    "frontendVersion": "1.20.7",
+    "VHS_latentpreview": false,
+    "VHS_latentpreviewrate": 0,
+    "VHS_MetadataImage": true,
+    "VHS_KeepIntermediate": true
+  },
+  "version": 0.4
+}

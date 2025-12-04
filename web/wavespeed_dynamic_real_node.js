@@ -1144,9 +1144,13 @@ async function initializeDynamicInterface(node) {
     const hasCachedData = node.wavespeedState.modelId && node.wavespeedState.parameters.length > 0;
 
     if (hasCachedData) {
-        logDebug("[WaveSpeed] Using cached model data for initialization");
+        logDebug("[WaveSpeed] ✅ Using cached model data for initialization:", {
+            modelId: node.wavespeedState.modelId,
+            category: node.wavespeedState.category,
+            parameterCount: node.wavespeedState.parameters.length
+        });
 
-        // Initialize with cached data
+        // Initialize with cached data (non-blocking for model list)
         await initializeWithCachedData(node);
     } else {
         logDebug("[WaveSpeed] No cached data, performing fresh initialization");
@@ -1246,34 +1250,46 @@ async function initializeWithCachedData(node) {
         logDebug("[WaveSpeed] Reset parameter mapping for cache restoration");
     }
 
-    // Add category selector and wait for it to load
-    await addCategorySelector(node);
+    // Add category selector (don't wait for categories to load)
+    const categoriesPromise = addCategorySelector(node);
     if (node.categoryWidget && node.wavespeedState.category) {
         node.categoryWidget.value = node.wavespeedState.category;
         logDebug(`[WaveSpeed] Set category widget value to: ${node.wavespeedState.category}`);
     }
 
-    // Add model selector and restore value
+    // Add model selector
     addModelSelector(node);
-    if (node.modelWidget && node.wavespeedState.modelId) {
-        // We need to restore the display name, not the ID
-        await restoreModelDisplayName(node);
-    }
-
-    // Restore parameters from cached data
+    
+    // CRITICAL FIX: Restore parameters FIRST, don't wait for model list to load
+    // This ensures the node renders immediately with cached parameters
     if (node.wavespeedState.parameters.length > 0) {
+        logDebug(`[WaveSpeed] Restoring ${node.wavespeedState.parameters.length} cached parameters immediately`);
         logDebug(`[WaveSpeed] Before restoring parameters, current inputs:`, node.inputs ? node.inputs.map(i => ({ name: i.name, _wavespeed_dynamic: i._wavespeed_dynamic })) : []);
         await restoreParametersFromCache(node);
         logDebug(`[WaveSpeed] After restoring parameters, current inputs:`, node.inputs ? node.inputs.map(i => ({ name: i.name, _wavespeed_dynamic: i._wavespeed_dynamic })) : []);
     }
 
-    // CRITICAL: Clear the restoration flag after completion
+    // CRITICAL: Clear the restoration flag after parameter restoration
     node.wavespeedState.isRestoringFromCache = false;
     
     // CRITICAL: Exit configuration mode
     WAVESPEED_STATE.graph_being_configured--;
     
-    logDebug("[WaveSpeed] Cached data initialization completed");
+    logDebug("[WaveSpeed] Cached data initialization completed (parameters restored)");
+    
+    // OPTIMIZATION: Restore model display name asynchronously (non-blocking)
+    // This allows the node to render immediately while model list loads in background
+    if (node.modelWidget && node.wavespeedState.modelId) {
+        logDebug("[WaveSpeed] Starting async model display name restoration...");
+        // Wait for categories to load first, then restore model display name
+        categoriesPromise.then(() => {
+            return restoreModelDisplayName(node);
+        }).then(() => {
+            logDebug("[WaveSpeed] Model display name restoration completed");
+        }).catch(error => {
+            logWarn("[WaveSpeed] Failed to restore model display name:", error);
+        });
+    }
 }
 
 // Restore model display name from cached model ID
@@ -1285,6 +1301,12 @@ async function restoreModelDisplayName(node) {
 
         if (!node.wavespeedState.category) {
             logWarn("[WaveSpeed] Cannot restore model display name without category");
+            // OPTIMIZATION: Use modelId as temporary display value
+            if (node.modelWidget && node.wavespeedState.modelId) {
+                node.modelWidget.value = node.wavespeedState.modelId;
+                node.modelWidget.options.values = ["", node.wavespeedState.modelId];
+                logDebug(`[WaveSpeed] Using modelId as temporary display value: ${node.wavespeedState.modelId}`);
+            }
             return;
         }
 
@@ -1304,32 +1326,38 @@ async function restoreModelDisplayName(node) {
             node.modelWidget.value = model.name;
             const values = ["", ...models.map(m => m.name)];
             node.modelWidget.options.values = values;
-            logDebug(`[WaveSpeed] Restored model display name: ${model.name}`);
+            logDebug(`[WaveSpeed] ✅ Restored model display name: ${model.name}`);
         } else {
-            logWarn(`[WaveSpeed] Model not found or widget missing:`, {
+            logWarn(`[WaveSpeed] Model not found in list:`, {
                 modelFound: !!model,
                 widgetExists: !!node.modelWidget,
-                targetModelId: node.wavespeedState.modelId
+                targetModelId: node.wavespeedState.modelId,
+                availableModels: models.length
             });
 
-            // Fallback: still populate the dropdown with available models
-            if (node.modelWidget && models.length > 0) {
-                const values = ["", ...models.map(m => m.name)];
-                node.modelWidget.options.values = values;
-                logDebug(`[WaveSpeed] Populated model dropdown with ${models.length} models as fallback`);
+            // OPTIMIZATION: Use modelId as fallback display value
+            if (node.modelWidget) {
+                if (models.length > 0) {
+                    // Populate dropdown with available models
+                    const values = ["", ...models.map(m => m.name)];
+                    node.modelWidget.options.values = values;
+                    logDebug(`[WaveSpeed] Populated model dropdown with ${models.length} models`);
+                } else {
+                    // No models available, use modelId as temporary value
+                    node.modelWidget.value = node.wavespeedState.modelId;
+                    node.modelWidget.options.values = ["", node.wavespeedState.modelId];
+                    logDebug(`[WaveSpeed] Using modelId as fallback display value: ${node.wavespeedState.modelId}`);
+                }
             }
         }
     } catch (error) {
         logWarn("[WaveSpeed] Failed to restore model display name:", error);
 
-        // Emergency fallback: trigger model selector update
-        if (node.wavespeedState.category && node.modelWidget) {
-            logDebug("[WaveSpeed] Attempting emergency model selector update");
-            try {
-                await updateModelSelector(node);
-            } catch (updateError) {
-                console.error("[WaveSpeed] Emergency update also failed:", updateError);
-            }
+        // OPTIMIZATION: Use modelId as emergency fallback
+        if (node.modelWidget && node.wavespeedState.modelId) {
+            node.modelWidget.value = node.wavespeedState.modelId;
+            node.modelWidget.options.values = ["", node.wavespeedState.modelId];
+            logDebug(`[WaveSpeed] Using modelId as emergency fallback: ${node.wavespeedState.modelId}`);
         }
     }
 }
@@ -1510,6 +1538,38 @@ function getCategoryValue(node) {
     return node.wavespeedState.category;
 }
 
+// Compare two parameter arrays to check if they are equal
+function areParametersEqual(params1, params2) {
+    if (!params1 || !params2) return false;
+    if (params1.length !== params2.length) return false;
+    
+    // Compare each parameter's key properties
+    for (let i = 0; i < params1.length; i++) {
+        const p1 = params1[i];
+        const p2 = params2[i];
+        
+        // Compare essential properties
+        if (p1.name !== p2.name) return false;
+        if (p1.type !== p2.type) return false;
+        if (p1.required !== p2.required) return false;
+        
+        // Compare options for COMBO types
+        if (p1.type === 'COMBO' || p2.type === 'COMBO') {
+            const opts1 = JSON.stringify(p1.options || []);
+            const opts2 = JSON.stringify(p2.options || []);
+            if (opts1 !== opts2) return false;
+        }
+        
+        // Compare min/max for numeric types
+        if ((p1.type === 'INT' || p1.type === 'FLOAT') && 
+            (p2.type === 'INT' || p2.type === 'FLOAT')) {
+            if (p1.min !== p2.min || p1.max !== p2.max) return false;
+        }
+    }
+    
+    return true;
+}
+
 // Update model selector
 async function updateModelSelector(node) {
     if (!node.wavespeedState.category || !node.modelWidget) return;
@@ -1527,10 +1587,19 @@ async function updateModelSelector(node) {
         // Automatically select the first model
         if (models.length > 0) {
             const firstModel = models[0];
+            const previousModelId = node.wavespeedState.modelId;
+            
             node.modelWidget.value = firstModel.name;
             node.wavespeedState.modelId = firstModel.value;
             updateOriginalModelIdWidget(node, firstModel.value);
-            await updateModelParameters(node);
+            
+            // OPTIMIZATION: Only update parameters if model actually changed
+            if (previousModelId !== firstModel.value) {
+                logDebug(`[WaveSpeed] Model changed from "${previousModelId}" to "${firstModel.value}", updating parameters`);
+                await updateModelParameters(node);
+            } else {
+                logDebug(`[WaveSpeed] Model unchanged (${firstModel.value}), skipping parameter update`);
+            }
         } else {
             node.modelWidget.value = "";
             node.wavespeedState.modelId = "";
@@ -1565,6 +1634,19 @@ async function updateModelParameters(node) {
         if (parameters.length === 0) {
             clearModelParameters(node);
             return;
+        }
+
+        // OPTIMIZATION: Check if parameters have changed
+        // If model is already loaded with the same parameters, skip update
+        if (node.wavespeedState.parameters && node.wavespeedState.parameters.length > 0) {
+            const hasParametersChanged = !areParametersEqual(node.wavespeedState.parameters, parameters);
+            
+            if (!hasParametersChanged) {
+                logDebug(`[WaveSpeed] ✅ Model parameters unchanged, skipping update for model: ${node.wavespeedState.modelId}`);
+                return;
+            }
+            
+            logDebug(`[WaveSpeed] Parameters changed, updating for model: ${node.wavespeedState.modelId}`);
         }
 
         // Clear old dynamic parameters
