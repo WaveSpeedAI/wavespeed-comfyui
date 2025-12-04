@@ -9,16 +9,120 @@ import { app } from "../../../scripts/app.js";
 import { api } from "../../../scripts/api.js";
 import { ComfyWidgets } from "../../../scripts/widgets.js";
 
-console.log("[WaveSpeed] Loading dynamic real node extension...");
+const DEBUG_MODE = true;
+
+function logDebug(...args) {
+    if (DEBUG_MODE) {
+        console.log(...args);
+    }
+}
+
+function logWarn(...args) {
+    if (DEBUG_MODE) {
+        console.warn(...args);
+    }
+}
+
+logDebug("[WaveSpeed] Loading dynamic real node extension...");
+
+// Global state for tracking graph configuration
+const WAVESPEED_STATE = {
+    graph_being_configured: 0,  // Counter for nested configure calls
+    deferred_actions: []        // Actions to execute after graph configuration
+};
 
 // Global cache for model data - shared across all node instances
+// Uses localStorage for persistence across page refreshes
 const GLOBAL_CACHE = {
-    categories: null,
-    modelsByCategory: {},
-    modelDetails: {},
-    lastCategoryUpdate: 0,
-    lastModelUpdate: {},
-    cacheExpiry: 5 * 60 * 1000 // 5-minute cache expiration
+    cacheExpiry: 5 * 60 * 1000, // 5-minute cache expiration
+    
+    // Load from localStorage
+    get categories() {
+        try {
+            const cached = localStorage.getItem('wavespeed_categories');
+            if (cached) {
+                const data = JSON.parse(cached);
+                if (Date.now() - data.timestamp < this.cacheExpiry) {
+                    return data.value;
+                }
+            }
+        } catch (e) {
+            logWarn('[WaveSpeed] Failed to load categories from cache:', e);
+        }
+        return null;
+    },
+    set categories(value) {
+        try {
+            localStorage.setItem('wavespeed_categories', JSON.stringify({
+                value: value,
+                timestamp: Date.now()
+            }));
+        } catch (e) {
+            logWarn('[WaveSpeed] Failed to save categories to cache:', e);
+        }
+    },
+    
+    getModelsByCategory(category) {
+        try {
+            const cached = localStorage.getItem(`wavespeed_models_${category}`);
+            if (cached) {
+                const data = JSON.parse(cached);
+                if (Date.now() - data.timestamp < this.cacheExpiry) {
+                    return data.value;
+                }
+            }
+        } catch (e) {
+            logWarn(`[WaveSpeed] Failed to load models for ${category} from cache:`, e);
+        }
+        return null;
+    },
+    setModelsByCategory(category, value) {
+        try {
+            localStorage.setItem(`wavespeed_models_${category}`, JSON.stringify({
+                value: value,
+                timestamp: Date.now()
+            }));
+        } catch (e) {
+            logWarn(`[WaveSpeed] Failed to save models for ${category} to cache:`, e);
+        }
+    },
+    
+    getModelDetail(modelId) {
+        try {
+            const cached = localStorage.getItem(`wavespeed_model_${modelId}`);
+            if (cached) {
+                const data = JSON.parse(cached);
+                // Model details don't expire
+                return data.value;
+            }
+        } catch (e) {
+            logWarn(`[WaveSpeed] Failed to load model detail for ${modelId} from cache:`, e);
+        }
+        return null;
+    },
+    setModelDetail(modelId, value) {
+        try {
+            localStorage.setItem(`wavespeed_model_${modelId}`, JSON.stringify({
+                value: value,
+                timestamp: Date.now()
+            }));
+        } catch (e) {
+            logWarn(`[WaveSpeed] Failed to save model detail for ${modelId} to cache:`, e);
+        }
+    },
+    
+    // Intelligent parameter caching system
+    modelHistory: {
+        maxHistory: 5,  // Keep last 5 model switches
+        records: []     // Array of model parameter snapshots
+        // Each record: {
+        //     modelId: string,
+        //     category: string,
+        //     timestamp: number,
+        //     parameters: { paramName: { value, link, type } },
+        //     connections: { paramName: { originNode, originSlot, linkId, targetType } }
+        // }
+    }
 };
 
 // Utility function: Make an API request
@@ -56,35 +160,44 @@ function isCacheExpired(timestamp) {
 }
 
 async function getCachedCategories() {
-    if (!GLOBAL_CACHE.categories || isCacheExpired(GLOBAL_CACHE.lastCategoryUpdate)) {
-        console.log("[WaveSpeed] Fetching fresh categories...");
-        const categories = await getModelCategories();
-        GLOBAL_CACHE.categories = categories;
-        GLOBAL_CACHE.lastCategoryUpdate = Date.now();
+    const cached = GLOBAL_CACHE.categories;
+    if (cached) {
+        logDebug("[WaveSpeed] ✅ Using cached categories");
+        return cached;
     }
-    return GLOBAL_CACHE.categories;
+    
+    logDebug("[WaveSpeed] Fetching fresh categories...");
+    const categories = await getModelCategories();
+    GLOBAL_CACHE.categories = categories;
+    return categories;
 }
 
 async function getCachedModelsByCategory(category) {
-    if (!GLOBAL_CACHE.modelsByCategory[category] ||
-        isCacheExpired(GLOBAL_CACHE.lastModelUpdate[category] || 0)) {
-        console.log(`[WaveSpeed] Fetching fresh models for category: ${category}`);
-        const models = await getModelsByCategory(category);
-        GLOBAL_CACHE.modelsByCategory[category] = models;
-        GLOBAL_CACHE.lastModelUpdate[category] = Date.now();
+    const cached = GLOBAL_CACHE.getModelsByCategory(category);
+    if (cached) {
+        logDebug(`[WaveSpeed] ✅ Using cached models for category: ${category}`);
+        return cached;
     }
-    return GLOBAL_CACHE.modelsByCategory[category];
+    
+    logDebug(`[WaveSpeed] Fetching fresh models for category: ${category}`);
+    const models = await getModelsByCategory(category);
+    GLOBAL_CACHE.setModelsByCategory(category, models);
+    return models;
 }
 
 async function getCachedModelDetail(modelId) {
-    if (!GLOBAL_CACHE.modelDetails[modelId]) {
-        console.log(`[WaveSpeed] Fetching fresh model detail: ${modelId}`);
-        const detail = await getModelDetail(modelId);
-        if (detail) {
-            GLOBAL_CACHE.modelDetails[modelId] = detail;
-        }
+    const cached = GLOBAL_CACHE.getModelDetail(modelId);
+    if (cached) {
+        logDebug(`[WaveSpeed] ✅ Using cached model detail: ${modelId}`);
+        return cached;
     }
-    return GLOBAL_CACHE.modelDetails[modelId];
+    
+    logDebug(`[WaveSpeed] Fetching fresh model detail: ${modelId}`);
+    const detail = await getModelDetail(modelId);
+    if (detail) {
+        GLOBAL_CACHE.setModelDetail(modelId, detail);
+    }
+    return detail;
 }
 
 // Check if a property is a LoraWeight type
@@ -137,7 +250,7 @@ function parseModelParameters(inputSchema) {
             param.type = "LORA_WEIGHT";
             param.isLoraWeight = true;
             param.isLoraArray = prop.type === 'array';
-            console.log(`[WaveSpeed] Detected LoraWeight parameter: ${propName}`, {
+            logDebug(`[WaveSpeed] Detected LoraWeight parameter: ${propName}`, {
                 isArray: param.isLoraArray,
                 originalType: prop.type,
                 hasItems: !!prop.items,
@@ -236,9 +349,309 @@ function getInputPortPriority(param) {
     return 10;
 }
 
+// ============================================================================
+// INTELLIGENT PARAMETER CACHING SYSTEM
+// ============================================================================
+
+/**
+ * Save current model's parameters and connections to history
+ * @param {Object} node - The node instance
+ */
+function saveModelToHistory(node) {
+    if (!node.wavespeedState || !node.wavespeedState.modelId) {
+        logDebug("[WaveSpeed] No model to save to history");
+        return;
+    }
+
+    const modelId = node.wavespeedState.modelId;
+    const category = node.wavespeedState.category;
+    
+    logDebug(`[WaveSpeed] Saving model "${modelId}" to history...`);
+
+    // Collect parameter values
+    const parameters = {};
+    const connections = {};
+    
+    if (node.wavespeedState.parameters) {
+        for (const param of node.wavespeedState.parameters) {
+            const paramName = param.name;
+            
+            // Get parameter value from widgets
+            const widget = node.widgets?.find(w => w.name === `* ${paramName}` || w.name === paramName);
+            const value = widget ? widget.value : (node.wavespeedState.parameterValues?.[paramName] || param.default);
+            
+            // Get connection info from inputs
+            let link = null;
+            let connectionInfo = null;
+            
+            if (node.inputs) {
+                const input = node.inputs.find(i => i.name === paramName && !i.name.match(/^param_\d+$/));
+                logDebug(`[WaveSpeed] Checking input for "${paramName}":`, {
+                    found: !!input,
+                    hasLink: input?.link != null,
+                    linkId: input?.link
+                });
+                
+                if (input && input.link != null) {
+                    link = input.link;
+                    
+                    // Try to get detailed connection info from the graph
+                    if (node.graph && node.graph.links && node.graph.links[input.link]) {
+                        const linkObj = node.graph.links[input.link];
+                        connectionInfo = {
+                            originNode: linkObj.origin_id,
+                            originSlot: linkObj.origin_slot,
+                            linkId: input.link,
+                            targetType: input.type
+                        };
+                        logDebug(`[WaveSpeed] ✅ Saved connection info for "${paramName}":`, connectionInfo);
+                    } else {
+                        logWarn(`[WaveSpeed] ⚠️ Link ${input.link} found but linkObj not in graph.links`);
+                    }
+                }
+            }
+            
+            parameters[paramName] = {
+                value: value,
+                link: link,
+                type: param.type
+            };
+            
+            if (connectionInfo) {
+                connections[paramName] = connectionInfo;
+            }
+        }
+    }
+
+    // Create history record
+    const record = {
+        modelId: modelId,
+        category: category,
+        timestamp: Date.now(),
+        parameters: parameters,
+        connections: connections
+    };
+
+    // Add to history, maintaining max size
+    const history = GLOBAL_CACHE.modelHistory.records;
+    
+    // Remove existing record for this model (if any)
+    const existingIndex = history.findIndex(r => r.modelId === modelId);
+    if (existingIndex >= 0) {
+        history.splice(existingIndex, 1);
+        logDebug(`[WaveSpeed] Removed old record for model "${modelId}"`);
+    }
+    
+    // Add new record at the beginning (most recent)
+    history.unshift(record);
+    
+    // Keep only maxHistory records
+    if (history.length > GLOBAL_CACHE.modelHistory.maxHistory) {
+        const removed = history.splice(GLOBAL_CACHE.modelHistory.maxHistory);
+        logDebug(`[WaveSpeed] Removed ${removed.length} old history records`);
+    }
+    
+    logDebug(`[WaveSpeed] Saved model to history. Total records: ${history.length}`);
+    logDebug(`[WaveSpeed] Saved ${Object.keys(parameters).length} parameters, ${Object.keys(connections).length} connections`);
+}
+
+/**
+ * Restore parameters and connections from history for a model
+ * @param {Object} node - The node instance
+ * @param {string} modelId - The model ID to restore
+ * @returns {Object|null} - The restored record or null if not found
+ */
+function getModelFromHistory(modelId) {
+    const history = GLOBAL_CACHE.modelHistory.records;
+    const record = history.find(r => r.modelId === modelId);
+    
+    if (record) {
+        logDebug(`[WaveSpeed] Found history record for model "${modelId}"`, {
+            parameterCount: Object.keys(record.parameters).length,
+            connectionCount: Object.keys(record.connections).length,
+            age: Math.round((Date.now() - record.timestamp) / 1000) + 's ago'
+        });
+        return record;
+    }
+    
+    logDebug(`[WaveSpeed] No history record found for model "${modelId}"`);
+    return null;
+}
+
+/**
+ * Find matching parameters from recent history
+ * Searches for same parameter names in recent model switches
+ * @param {Array} currentParameters - Current model's parameter definitions
+ * @returns {Object} - Matched parameter values and connections
+ */
+function findMatchingParametersFromHistory(currentParameters) {
+    const matches = {
+        parameters: {},
+        connections: {}
+    };
+    
+    if (!currentParameters || currentParameters.length === 0) {
+        return matches;
+    }
+    
+    const currentParamNames = new Set(currentParameters.map(p => p.name));
+    const history = GLOBAL_CACHE.modelHistory.records;
+    
+    logDebug(`[WaveSpeed] Searching for matching parameters in ${history.length} history records...`);
+    
+    // Go through history from most recent to oldest
+    for (const record of history) {
+        for (const [paramName, paramData] of Object.entries(record.parameters)) {
+            // If this parameter name exists in current model and we haven't found it yet
+            if (currentParamNames.has(paramName) && !matches.parameters[paramName]) {
+                matches.parameters[paramName] = paramData;
+                
+                // Also check for connection
+                if (record.connections[paramName]) {
+                    matches.connections[paramName] = record.connections[paramName];
+                }
+                
+                logDebug(`[WaveSpeed] Found match for "${paramName}" from model "${record.modelId}"`);
+            }
+        }
+    }
+    
+    logDebug(`[WaveSpeed] Found ${Object.keys(matches.parameters).length} matching parameters from history`);
+    return matches;
+}
+
+/**
+ * Restore parameter values and connections from history after creating widgets
+ * @param {Object} node - The node instance
+ * @param {Array} parameters - The parameter definitions for current model
+ */
+function restoreParametersFromHistory(node, parameters) {
+    if (!node.wavespeedState || !node.wavespeedState.modelId) {
+        return;
+    }
+
+    const modelId = node.wavespeedState.modelId;
+    logDebug(`[WaveSpeed] Attempting to restore parameters for model "${modelId}"...`);
+
+    // Try to get exact match from history first
+    let historyRecord = getModelFromHistory(modelId);
+    let matches = null;
+
+    if (!historyRecord) {
+        // No exact match, try to find matching parameters from recent history
+        matches = findMatchingParametersFromHistory(parameters);
+        
+        if (Object.keys(matches.parameters).length === 0) {
+            logDebug("[WaveSpeed] No history data to restore");
+            return;
+        }
+    }
+
+    // Restore parameter values and connections
+    const parametersToRestore = historyRecord ? historyRecord.parameters : matches.parameters;
+    const connectionsToRestore = historyRecord ? historyRecord.connections : matches.connections;
+    
+    let restoredCount = 0;
+    let connectionCount = 0;
+
+    for (const param of parameters) {
+        const paramName = param.name;
+        const paramData = parametersToRestore[paramName];
+        
+        if (!paramData) {
+            continue;
+        }
+
+        // Restore widget value
+        const widget = node.widgets?.find(w => 
+            w.name === `* ${paramName}` || w.name === paramName
+        );
+        
+        if (widget) {
+            widget.value = paramData.value;
+            node.wavespeedState.parameterValues[paramName] = paramData.value;
+            restoredCount++;
+            logDebug(`[WaveSpeed] Restored value for "${paramName}":`, paramData.value);
+        }
+
+        // Restore connection (if exists)
+        const connectionData = connectionsToRestore?.[paramName];
+        logDebug(`[WaveSpeed] Checking connection for "${paramName}":`, {
+            hasConnectionData: !!connectionData,
+            connectionData: connectionData,
+            hasInputs: !!node.inputs,
+            hasGraph: !!node.graph,
+            inputCount: node.inputs?.length
+        });
+        
+        if (connectionData && node.inputs && node.graph) {
+            const inputIndex = node.inputs.findIndex(i => 
+                i.name === paramName && !i.name.match(/^param_\d+$/)
+            );
+            
+            logDebug(`[WaveSpeed] Found input index for "${paramName}": ${inputIndex}`);
+            
+            if (inputIndex >= 0) {
+                // Verify the source node and slot still exist
+                const sourceNode = node.graph.getNodeById(connectionData.originNode);
+                logDebug(`[WaveSpeed] Source node check:`, {
+                    nodeId: connectionData.originNode,
+                    nodeExists: !!sourceNode,
+                    hasOutputs: !!sourceNode?.outputs,
+                    outputSlot: connectionData.originSlot,
+                    slotExists: !!sourceNode?.outputs?.[connectionData.originSlot]
+                });
+                
+                if (sourceNode && sourceNode.outputs && sourceNode.outputs[connectionData.originSlot]) {
+                    try {
+                        // Use LiteGraph's connect method to create a NEW link
+                        // This ensures proper link ID allocation and graph consistency
+                        sourceNode.connect(connectionData.originSlot, node, inputIndex);
+                        connectionCount++;
+                        logDebug(`[WaveSpeed] ✅ Recreated connection for "${paramName}" from node ${connectionData.originNode} slot ${connectionData.originSlot}`);
+                    } catch (error) {
+                        logWarn(`[WaveSpeed] ❌ Failed to recreate connection for "${paramName}":`, error);
+                    }
+                } else {
+                    logWarn(`[WaveSpeed] ❌ Cannot restore connection for "${paramName}": source node or slot not found`);
+                }
+            } else {
+                logWarn(`[WaveSpeed] ❌ Cannot find input for "${paramName}" in node.inputs:`, node.inputs.map(i => i.name));
+            }
+        }
+    }
+
+    if (historyRecord) {
+        logDebug(`[WaveSpeed] ✅ Restored from exact model history: ${restoredCount} values, ${connectionCount} connections`);
+    } else {
+        logDebug(`[WaveSpeed] ✅ Restored from matching parameters: ${restoredCount} values, ${connectionCount} connections`);
+    }
+}
+
 // Register extension to modify the real node
 app.registerExtension({
     name: "wavespeed.DynamicRealNode",
+    
+    // Hook into graph configuration lifecycle
+    beforeConfigureGraph() {
+        WAVESPEED_STATE.graph_being_configured++;
+        logDebug(`[WaveSpeed] beforeConfigureGraph: graph_being_configured = ${WAVESPEED_STATE.graph_being_configured}`);
+    },
+    
+    afterConfigureGraph() {
+        WAVESPEED_STATE.graph_being_configured--;
+        logDebug(`[WaveSpeed] afterConfigureGraph: graph_being_configured = ${WAVESPEED_STATE.graph_being_configured}`);
+        
+        // Execute any deferred actions
+        while (WAVESPEED_STATE.deferred_actions.length > 0) {
+            const action = WAVESPEED_STATE.deferred_actions.shift();
+            try {
+                action.fn(...action.args);
+            } catch (e) {
+                console.error(`[WaveSpeed] Error executing deferred action:`, e);
+            }
+        }
+    },
 
     async nodeCreated(node) {
         // Only apply to our target node
@@ -246,10 +659,10 @@ app.registerExtension({
             return;
         }
 
-        console.log("[WaveSpeed] Enhancing real node with dynamic capabilities:", node.id);
+        logDebug("[WaveSpeed] Enhancing real node with dynamic capabilities:", node.id);
 
         // Debug: Log initial node state
-        console.log("[WaveSpeed] Initial node state:", {
+        logDebug("[WaveSpeed] Initial node state:", {
             id: node.id,
             inputCount: node.inputs ? node.inputs.length : 0,
             inputNames: node.inputs ? node.inputs.map(i => i.name) : [],
@@ -269,7 +682,8 @@ app.registerExtension({
             paramMapping: {}, // Maps parameter names to param_* placeholder names
             usedPlaceholders: new Set(), // Track which placeholders are in use
             nextPlaceholderIndex: 1, // Next available param_* index
-            hiddenWidgets: {} // Store hidden widgets separately from main widgets array
+            hiddenWidgets: {}, // Store hidden widgets separately from main widgets array
+            isRestoringFromCache: false // Flag to prevent duplicate parameter loading during cache restoration
         };
 
         // Store original widgets for later cleanup
@@ -280,11 +694,11 @@ app.registerExtension({
         const originalComputeSize = node.computeSize;
         node.computeSize = function(out) {
             let size = originalComputeSize ? originalComputeSize.call(this, out) : [200, 100];
-            console.log(`[WaveSpeed] Original computed size: [${size[0]}, ${size[1]}]`);
+            logDebug(`[WaveSpeed] Original computed size: [${size[0]}, ${size[1]}]`);
 
             // Calculate ONLY visible widgets (completely ignore hidden widgets)
             if (this.widgets && this.widgets.length > 0) {
-                console.log(`[WaveSpeed] Widget positioning analysis for node ${this.id}:`);
+                logDebug(`[WaveSpeed] Widget positioning analysis for node ${this.id}:`);
 
                 let currentY = 30; // Starting Y position (header height)
                 let maxRequiredHeight = currentY;
@@ -298,7 +712,7 @@ app.registerExtension({
                     // CRITICAL FIX: Skip hidden widgets AND internal widgets completely
                     if (widget.hidden ||
                         (widget.name === 'model_id' || widget.name === 'request_json' || widget.name === 'param_map')) {
-                        console.log(`[WaveSpeed]   Widget "${widget.name}": HIDDEN/INTERNAL, completely skipped`);
+                        logDebug(`[WaveSpeed]   Widget "${widget.name}": HIDDEN/INTERNAL, completely skipped`);
                         continue;
                     }
 
@@ -312,22 +726,22 @@ app.registerExtension({
                         const lines = Math.max((widget.value || "").split('\n').length, 3);
                         widgetHeight = Math.max(80, lines * 22); // Increased minimum height and line height
                         widgetMargin = 12; // Extra margin for multiline widgets
-                        console.log(`[WaveSpeed]   Widget "${widget.name}": multiline, ${lines} lines, height=${widgetHeight}px, y=${currentY}`);
+                        logDebug(`[WaveSpeed]   Widget "${widget.name}": multiline, ${lines} lines, height=${widgetHeight}px, y=${currentY}`);
                     } else if (widget._wavespeed_is_lora_weight) {
                         // Special handling for LoRA weight widgets (multiline)
                         multilineWidgetCount++;
                         const lines = Math.max((widget.value || "").split('\n').length, 4); // Default to 4 lines for LoRA
                         widgetHeight = Math.max(100, lines * 22); // Minimum 100px for LoRA widgets
                         widgetMargin = 15; // Extra margin for LoRA widgets
-                        console.log(`[WaveSpeed]   Widget "${widget.name}": LoRA weight, ${lines} lines, height=${widgetHeight}px, y=${currentY}`);
+                        logDebug(`[WaveSpeed]   Widget "${widget.name}": LoRA weight, ${lines} lines, height=${widgetHeight}px, y=${currentY}`);
                     } else if (widget.type === "combo") {
                         widgetHeight = 32; // Slightly taller for combo boxes
-                        console.log(`[WaveSpeed]   Widget "${widget.name}": combo, height=${widgetHeight}px, y=${currentY}`);
+                        logDebug(`[WaveSpeed]   Widget "${widget.name}": combo, height=${widgetHeight}px, y=${currentY}`);
                     } else if (widget.type === "number" || widget.type === "text") {
                         widgetHeight = 28; // Standard height for input fields
-                        console.log(`[WaveSpeed]   Widget "${widget.name}": ${widget.type}, height=${widgetHeight}px, y=${currentY}`);
+                        logDebug(`[WaveSpeed]   Widget "${widget.name}": ${widget.type}, height=${widgetHeight}px, y=${currentY}`);
                     } else {
-                        console.log(`[WaveSpeed]   Widget "${widget.name}": type=${widget.type}, height=${widgetHeight}px, y=${currentY}`);
+                        logDebug(`[WaveSpeed]   Widget "${widget.name}": type=${widget.type}, height=${widgetHeight}px, y=${currentY}`);
                     }
 
                     if (widget._wavespeed_is_array) {
@@ -342,14 +756,14 @@ app.registerExtension({
                 // Add bottom padding
                 maxRequiredHeight += 15;
 
-                console.log(`[WaveSpeed] Layout calculation: ${visibleWidgetCount} visible widgets, totalHeight=${maxRequiredHeight}px, multiline=${multilineWidgetCount}, arrays=${arrayWidgetCount}`);
+                logDebug(`[WaveSpeed] Layout calculation: ${visibleWidgetCount} visible widgets, totalHeight=${maxRequiredHeight}px, multiline=${multilineWidgetCount}, arrays=${arrayWidgetCount}`);
 
                 // OVERRIDE: Use our calculated height instead of the original
                 size[1] = maxRequiredHeight;
-                console.log(`[WaveSpeed] OVERRIDE: Setting height to calculated ${maxRequiredHeight}px`);
+                logDebug(`[WaveSpeed] OVERRIDE: Setting height to calculated ${maxRequiredHeight}px`);
             }
 
-            console.log(`[WaveSpeed] Final computed size: [${size[0]}, ${size[1]}]`);
+            logDebug(`[WaveSpeed] Final computed size: [${size[0]}, ${size[1]}]`);
             return size;
         };
 
@@ -367,8 +781,8 @@ app.registerExtension({
 
         // Delay the dynamic interface initialization to ensure ComfyUI is fully ready
         setTimeout(() => {
-            console.log("[WaveSpeed] Delayed initialization starting...");
-            console.log("[WaveSpeed] Node state before initialization:", {
+            logDebug("[WaveSpeed] Delayed initialization starting...");
+            logDebug("[WaveSpeed] Node state before initialization:", {
                 inputCount: node.inputs ? node.inputs.length : 0,
                 inputNames: node.inputs ? node.inputs.map(i => i.name) : [],
                 placeholderInputs: node.inputs ? node.inputs.filter(i => i.name && i.name.match(/^param_\d+$/)).map(i => ({ name: i.name, hidden: i.hidden })) : []
@@ -384,7 +798,7 @@ app.registerExtension({
 
 // Setup persistent input hiding that works continuously
 function setupPersistentInputHiding(node) {
-    console.log("[WaveSpeed] Setting up persistent input hiding for node:", node.id);
+    logDebug("[WaveSpeed] Setting up persistent input hiding for node:", node.id);
 
     // Store original inputs for restoration
     node._wavespeed_originalInputs = node.inputs ? [...node.inputs] : [];
@@ -392,17 +806,17 @@ function setupPersistentInputHiding(node) {
     // Check for cached model information from workflow load
     const originalConfigure = node.configure;
     node.configure = function(data) {
-        console.log("[WaveSpeed] Configuring node with data:", data);
+        logDebug("[WaveSpeed] Configuring node with data:", data);
 
         // Check for dynamic state (highest priority for execution)
         if (data._wavespeed_dynamic_state) {
-            console.log("[WaveSpeed] Found dynamic state in workflow data");
+            logDebug("[WaveSpeed] Found dynamic state in workflow data");
             this._wavespeed_dynamic_state = data._wavespeed_dynamic_state;
         }
 
         // Check for cached model information (for UI restoration)
         if (data._wavespeed_model_cache) {
-            console.log("[WaveSpeed] Found model cache in workflow data");
+            logDebug("[WaveSpeed] Found model cache in workflow data");
             this._wavespeed_model_cache = data._wavespeed_model_cache;
         }
 
@@ -433,7 +847,7 @@ function setupPersistentInputHiding(node) {
         // Store hidden inputs for connection purposes
         node._wavespeed_hiddenInputs = hiddenInputs;
 
-        console.log(`[WaveSpeed] Input filtering: ${visibleInputs.length} visible, ${hiddenInputs.length} hidden`);
+        logDebug(`[WaveSpeed] Input filtering: ${visibleInputs.length} visible, ${hiddenInputs.length} hidden`);
         return visibleInputs;
     };
 
@@ -464,11 +878,11 @@ function setupPersistentInputHiding(node) {
                 input.hidden = true;
                 input._wavespeed_placeholder = true;
                 hiddenInputs.push(input);
-                console.log(`[WaveSpeed] Hiding placeholder input: ${input.name}`);
+                logDebug(`[WaveSpeed] Hiding placeholder input: ${input.name}`);
             } else {
                 // This is a visible input (including dynamic parameter inputs)
                 visibleInputs.push(input);
-                console.log(`[WaveSpeed] Keeping visible input: ${input.name}`);
+                logDebug(`[WaveSpeed] Keeping visible input: ${input.name}`);
             }
         }
 
@@ -476,7 +890,7 @@ function setupPersistentInputHiding(node) {
         this._wavespeed_hiddenInputs = hiddenInputs;
         this._wavespeed_allInputs = allInputs;
 
-        console.log(`[WaveSpeed] Updated visibility: ${visibleInputs.length} visible, ${hiddenInputs.length} hidden`);
+        logDebug(`[WaveSpeed] Updated visibility: ${visibleInputs.length} visible, ${hiddenInputs.length} hidden`);
 
         // Update the actual stored inputs to only include visible ones
         _actualInputs = visibleInputs;
@@ -514,7 +928,7 @@ function setupPersistentInputHiding(node) {
     // Apply initial filtering - but delay it to ensure inputs are properly set up
     setTimeout(() => {
         if (node._updateVisibleInputs) {
-            console.log("[WaveSpeed] Applying initial input filtering after setup");
+            logDebug("[WaveSpeed] Applying initial input filtering after setup");
             node._updateVisibleInputs();
         }
     }, 100);
@@ -528,7 +942,7 @@ function setupPersistentInputHiding(node) {
 
         // Check if inputs have been modified externally
         if (node._wavespeed_allInputs && _actualInputs.length !== node._wavespeed_allInputs.length - (node._wavespeed_hiddenInputs ? node._wavespeed_hiddenInputs.length : 0)) {
-            console.log("[WaveSpeed] Inputs modified externally, reapplying hiding");
+            logDebug("[WaveSpeed] Inputs modified externally, reapplying hiding");
             node._updateVisibleInputs();
         }
     }, 1000);
@@ -552,7 +966,16 @@ function setupDynamicInputHandling(node) {
     // Override onConnectionsChange to handle dynamic input connections
     const originalOnConnectionsChange = node.onConnectionsChange;
     node.onConnectionsChange = function(type, slotIndex, isConnected, linkInfo, ioSlot) {
-        console.log(`[WaveSpeed] Connection change: type=${type}, slot=${slotIndex}, connected=${isConnected}`, ioSlot);
+        // CRITICAL: Skip during graph configuration to avoid interfering with ComfyUI's workflow loading
+        if (WAVESPEED_STATE.graph_being_configured > 0) {
+            logDebug(`[WaveSpeed] Skipping connection change during graph configuration`);
+            if (originalOnConnectionsChange) {
+                originalOnConnectionsChange.call(this, type, slotIndex, isConnected, linkInfo, ioSlot);
+            }
+            return;
+        }
+        
+        logDebug(`[WaveSpeed] Connection change: type=${type}, slot=${slotIndex}, connected=${isConnected}`, ioSlot);
 
         // Call original handler first
         if (originalOnConnectionsChange) {
@@ -566,10 +989,10 @@ function setupDynamicInputHandling(node) {
                 // Sync the connection to the placeholder input
                 if (isConnected && linkInfo) {
                     placeholderInput.link = linkInfo.id;
-                    console.log(`[WaveSpeed] Synced connection for ${ioSlot.name} -> ${placeholderInput.name} (link: ${linkInfo.id})`);
+                    logDebug(`[WaveSpeed] Synced connection for ${ioSlot.name} -> ${placeholderInput.name} (link: ${linkInfo.id})`);
                 } else {
                     placeholderInput.link = null;
-                    console.log(`[WaveSpeed] Cleared connection for ${ioSlot.name} -> ${placeholderInput.name}`);
+                    logDebug(`[WaveSpeed] Cleared connection for ${ioSlot.name} -> ${placeholderInput.name}`);
                 }
             }
         }
@@ -590,7 +1013,7 @@ function setupDynamicInputHandling(node) {
                 if (input.link) {
                     if (!data.inputs[i]) data.inputs[i] = {};
                     data.inputs[i].link = input.link;
-                    console.log(`[WaveSpeed] Serializing connection for input ${input.name}: link ${input.link}`);
+                    logDebug(`[WaveSpeed] Serializing connection for input ${input.name}: link ${input.link}`);
                 }
             }
         }
@@ -604,7 +1027,7 @@ function setupDynamicInputHandling(node) {
                 parameterValues: this.wavespeedState.parameterValues,
                 paramMapping: this.wavespeedState.paramMapping
             };
-            console.log(`[WaveSpeed] Stored dynamic state for execution transformation`);
+            logDebug(`[WaveSpeed] Stored dynamic state for execution transformation`);
         }
 
         // CRITICAL: Cache model information in workflow for offline use
@@ -616,7 +1039,7 @@ function setupDynamicInputHandling(node) {
                 parameterValues: this.wavespeedState.parameterValues,
                 lastUpdated: Date.now()
             };
-            console.log(`[WaveSpeed] Cached model information in workflow`);
+            logDebug(`[WaveSpeed] Cached model information in workflow`);
         }
 
         return data;
@@ -629,7 +1052,7 @@ function setupDynamicInputHandling(node) {
 
         if (input && input._wavespeed_dynamic && input._wavespeed_placeholder_input) {
             // This is a visible dynamic input that maps to a hidden placeholder
-            console.log(`[WaveSpeed] Redirecting connection from visible input ${input.name} to placeholder ${input._wavespeed_placeholder_input.name}`);
+            logDebug(`[WaveSpeed] Redirecting connection from visible input ${input.name} to placeholder ${input._wavespeed_placeholder_input.name}`);
 
             // Connect to the placeholder instead, but also maintain the connection on the visible input
             const result = originalConnectInput ? originalConnectInput.call(this, slot, output) : true;
@@ -650,7 +1073,7 @@ function setupDynamicInputHandling(node) {
 function restoreModelCacheIfAvailable(node) {
     // First check for dynamic state (execution data)
     if (node._wavespeed_dynamic_state) {
-        console.log("[WaveSpeed] Found dynamic state, restoring...");
+        logDebug("[WaveSpeed] Found dynamic state, restoring...");
 
         const dynamicState = node._wavespeed_dynamic_state;
 
@@ -661,13 +1084,13 @@ function restoreModelCacheIfAvailable(node) {
         node.wavespeedState.parameterValues = dynamicState.parameterValues || {};
         node.wavespeedState.paramMapping = dynamicState.paramMapping || {};
 
-        console.log("[WaveSpeed] Dynamic state restoration completed");
+        logDebug("[WaveSpeed] Dynamic state restoration completed");
         return true;
     }
 
     // Fallback to model cache (UI restoration data)
     if (node._wavespeed_model_cache) {
-        console.log("[WaveSpeed] Found cached model information, restoring...");
+        logDebug("[WaveSpeed] Found cached model information, restoring...");
 
         const cache = node._wavespeed_model_cache;
 
@@ -703,10 +1126,10 @@ function restoreModelCacheIfAvailable(node) {
 
             // Store in global cache
             GLOBAL_CACHE.modelDetails[cache.modelId] = modelDetail;
-            console.log(`[WaveSpeed] Restored model ${cache.modelId} to global cache`);
+            logDebug(`[WaveSpeed] Restored model ${cache.modelId} to global cache`);
         }
 
-        console.log("[WaveSpeed] Model cache restoration completed");
+        logDebug("[WaveSpeed] Model cache restoration completed");
         return true;
     }
 
@@ -715,21 +1138,43 @@ function restoreModelCacheIfAvailable(node) {
 
 // Initialize the dynamic interface for a node
 async function initializeDynamicInterface(node) {
-    console.log("[WaveSpeed] Initializing dynamic interface for node:", node.id);
+    logDebug("[WaveSpeed] Initializing dynamic interface for node:", node.id);
 
     // Check if we have cached model information to restore
     const hasCachedData = node.wavespeedState.modelId && node.wavespeedState.parameters.length > 0;
 
     if (hasCachedData) {
-        console.log("[WaveSpeed] Using cached model data for initialization");
+        logDebug("[WaveSpeed] Using cached model data for initialization");
 
         // Initialize with cached data
         await initializeWithCachedData(node);
     } else {
-        console.log("[WaveSpeed] No cached data, performing fresh initialization");
+        logDebug("[WaveSpeed] No cached data, performing fresh initialization");
 
         // Clear existing dynamic widgets but keep original ones
         clearDynamicWidgets(node);
+
+        // CRITICAL FIX: Also clear any residual dynamic inputs from old workflows
+        // This prevents inconsistent state where inputs exist but Category/Model are empty
+        if (node.inputs) {
+            const dynamicInputs = node.inputs.filter(input => 
+                input._wavespeed_dynamic && !input._wavespeed_placeholder &&
+                !input.name.match(/^param_\d+$/)
+            );
+            
+            if (dynamicInputs.length > 0) {
+                logDebug(`[WaveSpeed] Removing ${dynamicInputs.length} residual dynamic inputs from old workflow`);
+                node.inputs = node.inputs.filter(input => 
+                    !input._wavespeed_dynamic || input._wavespeed_placeholder ||
+                    input.name.match(/^param_\d+$/)
+                );
+                
+                // Update visible inputs if using new filtering system
+                if (node._updateVisibleInputs) {
+                    node._updateVisibleInputs();
+                }
+            }
+        }
 
         // Add category selector
         await addCategorySelector(node);
@@ -738,67 +1183,74 @@ async function initializeDynamicInterface(node) {
         addModelSelector(node);
     }
 
-    // CRITICAL: Force clear any existing dynamic inputs at initialization
-    // This prevents leftover inputs from previous node states
-    if (node.inputs) {
-        const currentInputs = [...node.inputs];
-        const dynamicInputs = currentInputs.filter(input =>
-            input._wavespeed_dynamic && !input._wavespeed_placeholder &&
-            !input.name.match(/^param_\d+$/)
-        );
-
-        if (dynamicInputs.length > 0) {
-            console.log(`[WaveSpeed] Found ${dynamicInputs.length} leftover dynamic inputs during initialization, removing them`);
-
-            // Remove dynamic inputs, keep only placeholders
-            node.inputs = currentInputs.filter(input =>
-                !input._wavespeed_dynamic || input._wavespeed_placeholder ||
-                input.name.match(/^param_\d+$/)
-            );
-
-            // Update visible inputs to hide placeholders
-            if (node._updateVisibleInputs) {
-                node._updateVisibleInputs();
-            }
-        }
-    }
-
     // Mark as initialized
     node.wavespeedState.isInitialized = true;
 
     // Debug: Check inputs after initialization
-    console.log("[WaveSpeed] Inputs after initialization:", {
+    logDebug("[WaveSpeed] Inputs after initialization:", {
         inputCount: node.inputs ? node.inputs.length : 0,
         placeholderInputs: node.inputs ? node.inputs.filter(i => i.name && i.name.match(/^param_\d+$/)).map(i => ({ name: i.name, hidden: i.hidden, _wavespeed_placeholder: i._wavespeed_placeholder })) : []
     });
 
-    console.log("[WaveSpeed] Dynamic interface initialized");
+    logDebug("[WaveSpeed] Dynamic interface initialized");
 
     // CRITICAL FIX: Force node size recalculation after initialization
     if (node.computeSize) {
         const newSize = node.computeSize();
-        console.log(`[WaveSpeed] Setting node size after initialization to: [${newSize[0]}, ${newSize[1]}]`);
+        logDebug(`[WaveSpeed] Setting node size after initialization to: [${newSize[0]}, ${newSize[1]}]`);
         node.setSize(newSize);
 
         // Verify the size was actually set
         setTimeout(() => {
-            console.log(`[WaveSpeed] Node actual size after setSize: [${node.size[0]}, ${node.size[1]}]`);
+            logDebug(`[WaveSpeed] Node actual size after setSize: [${node.size[0]}, ${node.size[1]}]`);
         }, 10);
     }
 }
 
 // Initialize with cached data (for workflow restoration)
 async function initializeWithCachedData(node) {
-    console.log("[WaveSpeed] Initializing with cached data...");
+    logDebug("[WaveSpeed] Initializing with cached data...");
 
-    // Clear existing dynamic widgets but keep original ones
+    // CRITICAL: Set flag to prevent duplicate parameter loading
+    node.wavespeedState.isRestoringFromCache = true;
+    
+    // CRITICAL: Mark that we're in configuration mode
+    WAVESPEED_STATE.graph_being_configured++;
+
+    // CRITICAL FIX: Clear ALL dynamic content before restoring from cache
+    // This prevents duplicate parameters when reloading workflows
     clearDynamicWidgets(node);
+    
+    // CRITICAL: Mark existing inputs for reuse instead of deleting them
+    // This preserves connections that ComfyUI has already restored from workflow data
+    // Deleting inputs would break the connection linkIds and cause validation warnings
+    if (node.inputs && node.wavespeedState.parameters.length > 0) {
+        const parameterNames = new Set(node.wavespeedState.parameters.map(p => p.name));
+        
+        // Mark existing parameter inputs so createWidgetInputPort can reuse them
+        for (const input of node.inputs) {
+            if (parameterNames.has(input.name) && !input.name.match(/^param_\d+$/)) {
+                input._wavespeed_dynamic = true;
+                input._wavespeed_reuse = true;  // Flag for reuse
+                logDebug(`[WaveSpeed] Marked existing input "${input.name}" for reuse (preserving link: ${input.link})`);
+            }
+        }
+    }
+    
+    // Reset parameter mapping to avoid conflicts
+    if (node.wavespeedState) {
+        node.wavespeedState.paramMapping = {};
+        node.wavespeedState.usedPlaceholders = node.wavespeedState.usedPlaceholders || new Set();
+        node.wavespeedState.usedPlaceholders.clear();
+        node.wavespeedState.nextPlaceholderIndex = 1;
+        logDebug("[WaveSpeed] Reset parameter mapping for cache restoration");
+    }
 
     // Add category selector and wait for it to load
     await addCategorySelector(node);
     if (node.categoryWidget && node.wavespeedState.category) {
         node.categoryWidget.value = node.wavespeedState.category;
-        console.log(`[WaveSpeed] Set category widget value to: ${node.wavespeedState.category}`);
+        logDebug(`[WaveSpeed] Set category widget value to: ${node.wavespeedState.category}`);
     }
 
     // Add model selector and restore value
@@ -810,32 +1262,40 @@ async function initializeWithCachedData(node) {
 
     // Restore parameters from cached data
     if (node.wavespeedState.parameters.length > 0) {
+        logDebug(`[WaveSpeed] Before restoring parameters, current inputs:`, node.inputs ? node.inputs.map(i => ({ name: i.name, _wavespeed_dynamic: i._wavespeed_dynamic })) : []);
         await restoreParametersFromCache(node);
+        logDebug(`[WaveSpeed] After restoring parameters, current inputs:`, node.inputs ? node.inputs.map(i => ({ name: i.name, _wavespeed_dynamic: i._wavespeed_dynamic })) : []);
     }
 
-    console.log("[WaveSpeed] Cached data initialization completed");
+    // CRITICAL: Clear the restoration flag after completion
+    node.wavespeedState.isRestoringFromCache = false;
+    
+    // CRITICAL: Exit configuration mode
+    WAVESPEED_STATE.graph_being_configured--;
+    
+    logDebug("[WaveSpeed] Cached data initialization completed");
 }
 
 // Restore model display name from cached model ID
 async function restoreModelDisplayName(node) {
     try {
-        console.log(`[WaveSpeed] Restoring model display name for model: ${node.wavespeedState.modelId}`);
-        console.log(`[WaveSpeed] Current category: ${node.wavespeedState.category}`);
-        console.log(`[WaveSpeed] Category list available: ${!!node.wavespeedState.categoryList}`);
+        logDebug(`[WaveSpeed] Restoring model display name for model: ${node.wavespeedState.modelId}`);
+        logDebug(`[WaveSpeed] Current category: ${node.wavespeedState.category}`);
+        logDebug(`[WaveSpeed] Category list available: ${!!node.wavespeedState.categoryList}`);
 
         if (!node.wavespeedState.category) {
-            console.warn("[WaveSpeed] Cannot restore model display name without category");
+            logWarn("[WaveSpeed] Cannot restore model display name without category");
             return;
         }
 
         const categoryValue = getCategoryValue(node);
-        console.log(`[WaveSpeed] Category value resolved to: ${categoryValue}`);
+        logDebug(`[WaveSpeed] Category value resolved to: ${categoryValue}`);
 
         const models = await getCachedModelsByCategory(categoryValue);
-        console.log(`[WaveSpeed] Found ${models.length} models for category ${categoryValue}`);
+        logDebug(`[WaveSpeed] Found ${models.length} models for category ${categoryValue}`);
 
         if (models.length > 0) {
-            console.log(`[WaveSpeed] Available models:`, models.map(m => `${m.name} (${m.value})`));
+            logDebug(`[WaveSpeed] Available models:`, models.map(m => `${m.name} (${m.value})`));
         }
 
         const model = models.find(m => m.value === node.wavespeedState.modelId);
@@ -844,9 +1304,9 @@ async function restoreModelDisplayName(node) {
             node.modelWidget.value = model.name;
             const values = ["", ...models.map(m => m.name)];
             node.modelWidget.options.values = values;
-            console.log(`[WaveSpeed] Restored model display name: ${model.name}`);
+            logDebug(`[WaveSpeed] Restored model display name: ${model.name}`);
         } else {
-            console.warn(`[WaveSpeed] Model not found or widget missing:`, {
+            logWarn(`[WaveSpeed] Model not found or widget missing:`, {
                 modelFound: !!model,
                 widgetExists: !!node.modelWidget,
                 targetModelId: node.wavespeedState.modelId
@@ -856,15 +1316,15 @@ async function restoreModelDisplayName(node) {
             if (node.modelWidget && models.length > 0) {
                 const values = ["", ...models.map(m => m.name)];
                 node.modelWidget.options.values = values;
-                console.log(`[WaveSpeed] Populated model dropdown with ${models.length} models as fallback`);
+                logDebug(`[WaveSpeed] Populated model dropdown with ${models.length} models as fallback`);
             }
         }
     } catch (error) {
-        console.warn("[WaveSpeed] Failed to restore model display name:", error);
+        logWarn("[WaveSpeed] Failed to restore model display name:", error);
 
         // Emergency fallback: trigger model selector update
         if (node.wavespeedState.category && node.modelWidget) {
-            console.log("[WaveSpeed] Attempting emergency model selector update");
+            logDebug("[WaveSpeed] Attempting emergency model selector update");
             try {
                 await updateModelSelector(node);
             } catch (updateError) {
@@ -877,7 +1337,7 @@ async function restoreModelDisplayName(node) {
 // Restore parameters from cached data
 async function restoreParametersFromCache(node) {
     try {
-        console.log(`[WaveSpeed] Restoring ${node.wavespeedState.parameters.length} cached parameters`);
+        logDebug(`[WaveSpeed] Restoring ${node.wavespeedState.parameters.length} cached parameters`);
 
         // Create dynamic parameter widgets and inputs from cached data
         const requiredParams = node.wavespeedState.parameters.filter(p => p.required);
@@ -923,9 +1383,9 @@ async function restoreParametersFromCache(node) {
         // Update request_json with parameter values
         updateRequestJsonWidget(node);
 
-        console.log("[WaveSpeed] Parameter restoration completed");
+        logDebug("[WaveSpeed] Parameter restoration completed");
     } catch (error) {
-        console.warn("[WaveSpeed] Failed to restore parameters from cache:", error);
+        logWarn("[WaveSpeed] Failed to restore parameters from cache:", error);
     }
 }
 
@@ -936,9 +1396,15 @@ async function addCategorySelector(node) {
         "Category",
         "",
         async (value) => {
+            // CRITICAL: Skip if restoring from cache to prevent duplicate loading
+            if (node.wavespeedState.isRestoringFromCache) {
+                logDebug(`[WaveSpeed] Category callback skipped during cache restoration: ${value}`);
+                return;
+            }
+            
             if (node.wavespeedState.category === value) return;
 
-            console.log(`[WaveSpeed] Category changed from '${node.wavespeedState.category}' to '${value}'`);
+            logDebug(`[WaveSpeed] Category changed from '${node.wavespeedState.category}' to '${value}'`);
 
             node.wavespeedState.category = value;
             clearModelAndParameters(node);
@@ -960,7 +1426,7 @@ async function addCategorySelector(node) {
         node.wavespeedState.categoryList = categories;
         const values = ["", ...categories.map(cat => cat.name)];
         categoryWidget.options.values = values;
-        console.log(`[WaveSpeed] Category selector populated with ${categories.length} categories`);
+        logDebug(`[WaveSpeed] Category selector populated with ${categories.length} categories`);
         return categories;
     });
 
@@ -976,6 +1442,12 @@ function addModelSelector(node) {
         "Model",
         "",
         async (value) => {
+            // CRITICAL: Skip if restoring from cache to prevent duplicate loading
+            if (node.wavespeedState.isRestoringFromCache) {
+                logDebug(`[WaveSpeed] Model callback skipped during cache restoration: ${value}`);
+                return;
+            }
+            
             if (value === "Loading...") return;
 
             if (value && node.wavespeedState.category) {
@@ -1022,11 +1494,11 @@ function updateOriginalModelIdWidget(node, modelId) {
             callback: () => {}, // Prevent LiteGraph warnings
             options: {}
         };
-        console.log(`[WaveSpeed] Created hidden model_id storage`);
+        logDebug(`[WaveSpeed] Created hidden model_id storage`);
     }
 
     node.wavespeedState.hiddenWidgets.model_id.value = modelId;
-    console.log(`[WaveSpeed] Updated hidden model_id to: ${modelId}`);
+    logDebug(`[WaveSpeed] Updated hidden model_id to: ${modelId}`);
 }
 
 // Get category value from category list
@@ -1065,7 +1537,7 @@ async function updateModelSelector(node) {
             updateOriginalModelIdWidget(node, "");
         }
     } catch (error) {
-        console.warn("Failed to update model selector:", error);
+        logWarn("Failed to update model selector:", error);
         node.modelWidget.options.values = [""];
         node.modelWidget.value = "";
         node.wavespeedState.modelId = "";
@@ -1101,7 +1573,7 @@ async function updateModelParameters(node) {
         // Save parameter information
         node.wavespeedState.parameters = parameters;
 
-        console.log(`[WaveSpeed] Model parameters: ${parameters.length} total`);
+        logDebug(`[WaveSpeed] Model parameters: ${parameters.length} total`);
 
         // Create dynamic parameter widgets and inputs
         const requiredParams = parameters.filter(p => p.required);
@@ -1131,7 +1603,7 @@ async function updateModelParameters(node) {
             return 0;
         });
 
-        console.log(`[WaveSpeed] Parameter allocation order:`, {
+        logDebug(`[WaveSpeed] Parameter allocation order:`, {
             needingInputs: paramsNeedingInputs.map(p => ({ name: p.name, priority: getInputPortPriority(p), required: p.required })),
             totalNeedingInputs: paramsNeedingInputs.length,
             availableSlots: 20
@@ -1145,13 +1617,16 @@ async function updateModelParameters(node) {
             createParameterWidget(node, param, i);
         }
 
+        // INTELLIGENT CACHING: Restore parameter values and connections from history
+        restoreParametersFromHistory(node, sortedParams);
+
         // Update request_json with parameter values
         updateRequestJsonWidget(node);
 
         // CRITICAL FIX: Force node size recalculation after adding all widgets
         if (node.computeSize) {
             const newSize = node.computeSize();
-            console.log(`[WaveSpeed] Setting node size after adding ${sortedParams.length} widgets to: [${newSize[0]}, ${newSize[1]}]`);
+            logDebug(`[WaveSpeed] Setting node size after adding ${sortedParams.length} widgets to: [${newSize[0]}, ${newSize[1]}]`);
             node.setSize(newSize);
 
             // IMMEDIATE: Force layout recalculation
@@ -1161,15 +1636,15 @@ async function updateModelParameters(node) {
 
             // Verify the size was actually set
             setTimeout(() => {
-                console.log(`[WaveSpeed] Node actual size after widget addition: [${node.size[0]}, ${node.size[1]}]`);
+                logDebug(`[WaveSpeed] Node actual size after widget addition: [${node.size[0]}, ${node.size[1]}]`);
 
                 // Additional check: ensure widgets are positioned correctly
                 if (node.widgets && node.widgets.length > 2) { // More than just Category and Model
-                    console.log(`[WaveSpeed] Widget positioning verification:`);
+                    logDebug(`[WaveSpeed] Widget positioning verification:`);
                     for (let i = 0; i < node.widgets.length; i++) {
                         const widget = node.widgets[i];
                         const widgetY = widget.y || 0;
-                        console.log(`[WaveSpeed]   Widget "${widget.name}": y=${widgetY}px`);
+                        logDebug(`[WaveSpeed]   Widget "${widget.name}": y=${widgetY}px`);
                     }
                 }
             }, 10);
@@ -1179,7 +1654,7 @@ async function updateModelParameters(node) {
         setTimeout(() => {
             if (node.computeSize) {
                 const delayedSize = node.computeSize();
-                console.log(`[WaveSpeed] Setting delayed node size to: [${delayedSize[0]}, ${delayedSize[1]}]`);
+                logDebug(`[WaveSpeed] Setting delayed node size to: [${delayedSize[0]}, ${delayedSize[1]}]`);
                 node.setSize(delayedSize);
 
                 // CRITICAL: Force canvas redraw to apply changes
@@ -1189,12 +1664,12 @@ async function updateModelParameters(node) {
 
                 // Final verification
                 setTimeout(() => {
-                    console.log(`[WaveSpeed] Final node size after delayed recalculation: [${node.size[0]}, ${node.size[1]}]`);
+                    logDebug(`[WaveSpeed] Final node size after delayed recalculation: [${node.size[0]}, ${node.size[1]}]`);
 
                     // Check if all widgets are visible and positioned correctly
                     if (node.widgets) {
                         const visibleWidgets = node.widgets.filter(w => !w.hidden);
-                        console.log(`[WaveSpeed] Final widget count: ${visibleWidgets.length} visible widgets`);
+                        logDebug(`[WaveSpeed] Final widget count: ${visibleWidgets.length} visible widgets`);
                     }
                 }, 50);
             }
@@ -1206,14 +1681,14 @@ async function updateModelParameters(node) {
         }
 
     } catch (error) {
-        console.warn("Failed to update model parameters:", error);
+        logWarn("Failed to update model parameters:", error);
         clearModelParameters(node);
     }
 }
 
 // Create parameter widget
 function createParameterWidget(node, param, paramIndex) {
-    console.log(`[WaveSpeed] Creating widget for parameter: ${param.name} (${param.type})`);
+    logDebug(`[WaveSpeed] Creating widget for parameter: ${param.name} (${param.type})`);
 
     const paramName = param.name.toLowerCase();
     const description = param.description?.toLowerCase() || '';
@@ -1291,7 +1766,7 @@ function createParameterWidget(node, param, paramIndex) {
             if (isArray) {
                 widget._wavespeed_is_array = true;
                 widget._wavespeed_array_item_type = param.arrayItems?.type || 'string';
-                console.log(`[WaveSpeed] Array parameter ${param.name} with item type: ${widget._wavespeed_array_item_type}`);
+                logDebug(`[WaveSpeed] Array parameter ${param.name} with item type: ${widget._wavespeed_array_item_type}`);
             }
         }
         // COMBO type
@@ -1370,7 +1845,7 @@ function createParameterWidget(node, param, paramIndex) {
         }
         // Default to string for other types
         else {
-            console.warn(`[WaveSpeed] Unknown parameter type: ${param.type}, using text widget`);
+            logWarn(`[WaveSpeed] Unknown parameter type: ${param.type}, using text widget`);
             widget = node.addWidget("text", displayName, param.default || "",
                 (value) => {
                     node.wavespeedState.parameterValues[param.name] = value;
@@ -1380,7 +1855,7 @@ function createParameterWidget(node, param, paramIndex) {
         }
 
         if (!widget) {
-            console.warn(`Widget creation returned null for parameter: ${param.name}`);
+            logWarn(`Widget creation returned null for parameter: ${param.name}`);
             return null;
         }
 
@@ -1400,7 +1875,7 @@ function createParameterWidget(node, param, paramIndex) {
             if (node.computeSize) {
                 const updatedSize = node.computeSize();
                 node.setSize(updatedSize);
-                console.log(`[WaveSpeed] Updated node size after adding widget "${param.name}": [${updatedSize[0]}, ${updatedSize[1]}]`);
+                logDebug(`[WaveSpeed] Updated node size after adding widget "${param.name}": [${updatedSize[0]}, ${updatedSize[1]}]`);
 
                 // Force canvas redraw for LoRA widgets to ensure proper positioning
                 if (widget._wavespeed_is_lora_weight && app.graph) {
@@ -1413,14 +1888,14 @@ function createParameterWidget(node, param, paramIndex) {
         if (shouldCreateInputPort(param)) {
             const inputPort = createWidgetInputPort(node, widget, param);
             if (!inputPort) {
-                console.warn(`[WaveSpeed] Could not create input port for ${param.name} - likely due to placeholder limit (20 max). Parameter will only have widget input.`);
+                logWarn(`[WaveSpeed] Could not create input port for ${param.name} - likely due to placeholder limit (20 max). Parameter will only have widget input.`);
             }
         }
 
-        console.log(`[WaveSpeed] Successfully created ${widget.type} widget for ${param.name}`);
+        logDebug(`[WaveSpeed] Successfully created ${widget.type} widget for ${param.name}`);
 
     } catch (error) {
-        console.warn(`Failed to create widget for parameter ${param.name}:`, error);
+        logWarn(`Failed to create widget for parameter ${param.name}:`, error);
         return null;
     }
 
@@ -1433,7 +1908,7 @@ function createWidgetInputPort(node, widget, param) {
         // Allocate a placeholder for this parameter
         const placeholderInfo = allocatePlaceholder(node, param);
         if (!placeholderInfo) {
-            console.warn(`[WaveSpeed] No available placeholder for parameter: ${param.name}`);
+            logWarn(`[WaveSpeed] No available placeholder for parameter: ${param.name}`);
             return null;
         }
 
@@ -1463,7 +1938,7 @@ function createWidgetInputPort(node, widget, param) {
         }
 
         if (!placeholderInput) {
-            console.warn(`[WaveSpeed] Placeholder input not found: ${placeholderName}. Available inputs:`, {
+            logWarn(`[WaveSpeed] Placeholder input not found: ${placeholderName}. Available inputs:`, {
                 hiddenInputs: node._wavespeed_hiddenInputs ? node._wavespeed_hiddenInputs.map(i => i.name) : [],
                 allInputs: node._wavespeed_allInputs ? node._wavespeed_allInputs.map(i => i.name) : [],
                 originalInputs: node._wavespeed_originalInputs ? node._wavespeed_originalInputs.map(i => i.name) : [],
@@ -1492,7 +1967,48 @@ function createWidgetInputPort(node, widget, param) {
             _wavespeed_placeholder_input: placeholderInput
         };
 
-        console.log(`[WaveSpeed] Creating visible input for ${param.name} -> ${placeholderName}`);
+        logDebug(`[WaveSpeed] Creating visible input for ${param.name} -> ${placeholderName}`);
+
+        // CRITICAL FIX: Check if this input already exists to prevent duplicates
+        if (node.inputs) {
+            logDebug(`[WaveSpeed] Checking for existing input "${param.name}", current inputs:`, node.inputs.map(i => ({ name: i.name, _wavespeed_dynamic: i._wavespeed_dynamic, _wavespeed_reuse: i._wavespeed_reuse, link: i.link })));
+            
+            // First priority: Check for inputs marked for reuse (from workflow loading)
+            // These inputs already have valid connections restored by ComfyUI
+            let existingInput = node.inputs.find(input =>
+                input.name === param.name &&
+                input._wavespeed_reuse
+            );
+            
+            // Second priority: Check for regular dynamic inputs
+            if (!existingInput) {
+                existingInput = node.inputs.find(input =>
+                    input.name === param.name &&
+                    input._wavespeed_dynamic &&
+                    !input._wavespeed_placeholder
+                );
+            }
+
+            if (existingInput) {
+                const hasConnection = existingInput.link != null;
+                logDebug(`[WaveSpeed] Reusing existing input "${param.name}" at index ${node.inputs.indexOf(existingInput)} (has connection: ${hasConnection}, link: ${existingInput.link})`);
+                
+                // Update the existing input's properties but preserve the connection
+                Object.assign(existingInput, {
+                    _wavespeed_dynamic: true,
+                    _wavespeed_param_name: param.name,
+                    _wavespeed_widget_pair: widget,
+                    _wavespeed_placeholder: placeholderName,
+                    _wavespeed_placeholder_input: placeholderInput
+                });
+                
+                // Clear the reuse flag
+                delete existingInput._wavespeed_reuse;
+                
+                widget._wavespeed_input_pair = existingInput;
+                return existingInput;
+            }
+        }
 
         // Use the node's own method to add the input safely
         if (node.addInput) {
@@ -1520,7 +2036,14 @@ function createWidgetInputPort(node, widget, param) {
                 // Record the paired input port on the widget
                 widget._wavespeed_input_pair = addedInput;
 
-                console.log(`[WaveSpeed] Successfully created input using addInput for: ${param.name} -> ${placeholderName} (type: ${inputType})`);
+                logDebug(`[WaveSpeed] Successfully created input using addInput for: ${param.name} -> ${placeholderName} (type: ${inputType})`);
+                logDebug(`[WaveSpeed] Total inputs after adding "${param.name}":`, node.inputs.length, node.inputs.map(i => i.name));
+                
+                // NOTE: Connection restoration is handled by:
+                // 1. ComfyUI's workflow loading mechanism (for page refresh)
+                // 2. restoreParametersFromHistory() (for model switching)
+                // We don't restore linkId here to avoid creating invalid ghost links
+                
                 return addedInput;
             }
         }
@@ -1536,11 +2059,16 @@ function createWidgetInputPort(node, widget, param) {
         // Record the paired input port on the widget
         widget._wavespeed_input_pair = paramInput;
 
-        console.log(`[WaveSpeed] Successfully created input manually for: ${param.name} -> ${placeholderName}`);
+        logDebug(`[WaveSpeed] Successfully created input manually for: ${param.name} -> ${placeholderName}`);
+        
+        // NOTE: Connection restoration is handled by:
+        // 1. ComfyUI's workflow loading mechanism (for page refresh)
+        // 2. restoreParametersFromHistory() (for model switching)
+        // We don't restore linkId here to avoid creating invalid ghost links
 
         return paramInput;
     } catch (error) {
-        console.warn(`Failed to create input port for widget ${param.name}:`, error);
+        logWarn(`Failed to create input port for widget ${param.name}:`, error);
     }
 
     return null;
@@ -1583,7 +2111,7 @@ function allocatePlaceholder(node, param) {
     // This is because LoRA weight can be both array and special type
     if (param.type === 'LORA_WEIGHT' || param.isLoraWeight) {
         paramType = 'lora-weight';
-        console.log(`[WaveSpeed] Detected LoRA weight parameter: ${paramName} -> ${paramType}`);
+        logDebug(`[WaveSpeed] Detected LoRA weight parameter: ${paramName} -> ${paramType}`);
     }
     // Only check array handling if not already identified as LoRA weight
     else if (param.isArray) {
@@ -1611,7 +2139,7 @@ function allocatePlaceholder(node, param) {
     // Update param_map widget
     updateParamMapWidget(node);
 
-    console.log(`[WaveSpeed] Allocated placeholder: ${paramName} -> ${placeholderName} (${paramType})`);
+    logDebug(`[WaveSpeed] Allocated placeholder: ${paramName} -> ${placeholderName} (${paramType})`);
     return placeholderInfo;
 }
 
@@ -1628,22 +2156,22 @@ function updateParamMapWidget(node) {
             callback: () => {}, // Prevent LiteGraph warnings
             options: {}
         };
-        console.log(`[WaveSpeed] Created hidden param_map storage`);
+        logDebug(`[WaveSpeed] Created hidden param_map storage`);
     }
 
     try {
         const mappingJson = JSON.stringify(node.wavespeedState.paramMapping);
         node.wavespeedState.hiddenWidgets.param_map.value = mappingJson;
-        console.log(`[WaveSpeed] Updated hidden param_map: ${mappingJson}`);
+        logDebug(`[WaveSpeed] Updated hidden param_map: ${mappingJson}`);
     } catch (error) {
-        console.warn("Failed to update param_map:", error);
+        logWarn("Failed to update param_map:", error);
         node.wavespeedState.hiddenWidgets.param_map.value = "{}";
     }
 }
 
 // Special handling for creating the seed widget
 function createSeedWidget(node, param, displayName) {
-    console.log(`[WaveSpeed] Creating special seed widget for: ${param.name}`);
+    logDebug(`[WaveSpeed] Creating special seed widget for: ${param.name}`);
 
     const widget = node.addWidget("number", displayName, param.default ?? -1,
         (value) => {
@@ -1692,7 +2220,7 @@ function updateRequestJsonWidget(node) {
             callback: () => {}, // Prevent LiteGraph warnings
             options: {}
         };
-        console.log(`[WaveSpeed] Created hidden request_json storage`);
+        logDebug(`[WaveSpeed] Created hidden request_json storage`);
     }
 
     const values = collectParameterValues(node);
@@ -1700,9 +2228,9 @@ function updateRequestJsonWidget(node) {
     try {
         const jsonString = JSON.stringify(values, null, 2);
         node.wavespeedState.hiddenWidgets.request_json.value = jsonString;
-        console.log(`[WaveSpeed] Updated hidden request_json:`, values);
+        logDebug(`[WaveSpeed] Updated hidden request_json:`, values);
     } catch (error) {
-        console.warn("Failed to update request_json:", error);
+        logWarn("Failed to update request_json:", error);
         node.wavespeedState.hiddenWidgets.request_json.value = "{}";
     }
 }
@@ -1727,17 +2255,17 @@ function collectParameterValues(node) {
                 const placeholderInfo = node.wavespeedState.paramMapping[paramName];
                 if (placeholderInfo && placeholderInfo.placeholder) {
                     connectedParams[paramName] = placeholderInfo;
-                    console.log(`[WaveSpeed] Parameter ${paramName} connected via ${placeholderInfo.placeholder} (${placeholderInfo.type})`);
+                    logDebug(`[WaveSpeed] Parameter ${paramName} connected via ${placeholderInfo.placeholder} (${placeholderInfo.type})`);
 
                     // For LoRA weight connections, we can also try to get the current value for preview
                     if (widget._wavespeed_is_lora_weight && pairedInput && pairedInput.link) {
                         try {
                             const inputData = node.getInputData(node.inputs.indexOf(pairedInput));
                             if (inputData) {
-                                console.log(`[WaveSpeed] LoRA connection data preview for ${paramName}:`, inputData);
+                                logDebug(`[WaveSpeed] LoRA connection data preview for ${paramName}:`, inputData);
                             }
                         } catch (error) {
-                            console.log(`[WaveSpeed] Could not preview LoRA connection data for ${paramName}:`, error);
+                            logDebug(`[WaveSpeed] Could not preview LoRA connection data for ${paramName}:`, error);
                         }
                     }
                 }
@@ -1762,9 +2290,9 @@ function collectParameterValues(node) {
                                 value = arrayValue; // Keep as strings
                             }
 
-                            console.log(`[WaveSpeed] Converted array parameter ${paramName} (${itemType}):`, value);
+                            logDebug(`[WaveSpeed] Converted array parameter ${paramName} (${itemType}):`, value);
                         } catch (error) {
-                            console.warn(`[WaveSpeed] Failed to convert array parameter ${paramName}:`, error);
+                            logWarn(`[WaveSpeed] Failed to convert array parameter ${paramName}:`, error);
                         }
                     }
                     // Handle LoRA weight type conversion
@@ -1776,9 +2304,9 @@ function collectParameterValues(node) {
                                 const parsed = JSON.parse(value);
                                 if (typeof parsed === 'object' && parsed.path && parsed.scale !== undefined) {
                                     value = parsed; // Use parsed object
-                                    console.log(`[WaveSpeed] Parsed single LoRA object for ${paramName}:`, value);
+                                    logDebug(`[WaveSpeed] Parsed single LoRA object for ${paramName}:`, value);
                                 } else {
-                                    console.warn(`[WaveSpeed] Invalid LoRA object format for ${paramName}:`, parsed);
+                                    logWarn(`[WaveSpeed] Invalid LoRA object format for ${paramName}:`, parsed);
                                 }
                             } else if (value.trim().startsWith('[') && value.trim().endsWith(']')) {
                                 // Array of LoraWeight objects
@@ -1790,13 +2318,13 @@ function collectParameterValues(node) {
                                     );
                                     if (validItems.length === parsed.length) {
                                         value = parsed; // Use parsed array
-                                        console.log(`[WaveSpeed] Parsed LoRA array for ${paramName}:`, value);
+                                        logDebug(`[WaveSpeed] Parsed LoRA array for ${paramName}:`, value);
                                     } else {
-                                        console.warn(`[WaveSpeed] Some LoRA items invalid for ${paramName}:`, parsed);
+                                        logWarn(`[WaveSpeed] Some LoRA items invalid for ${paramName}:`, parsed);
                                         value = validItems; // Use only valid items
                                     }
                                 } else {
-                                    console.warn(`[WaveSpeed] Invalid LoRA array format for ${paramName}:`, parsed);
+                                    logWarn(`[WaveSpeed] Invalid LoRA array format for ${paramName}:`, parsed);
                                 }
                             } else {
                                 // Handle comma-separated format: path1:scale1,path2:scale2
@@ -1822,14 +2350,14 @@ function collectParameterValues(node) {
                                 }
                                 if (loras.length > 0) {
                                     value = widget._wavespeed_is_lora_array ? loras : loras[0];
-                                    console.log(`[WaveSpeed] Parsed comma-separated LoRA for ${paramName}:`, value);
+                                    logDebug(`[WaveSpeed] Parsed comma-separated LoRA for ${paramName}:`, value);
                                 }
                             }
                         } catch (error) {
-                            console.warn(`[WaveSpeed] Failed to parse LoRA value for ${paramName}:`, error);
+                            logWarn(`[WaveSpeed] Failed to parse LoRA value for ${paramName}:`, error);
                             // Keep original string value as fallback
                         }
-                        console.log(`[WaveSpeed] Final LoRA value for ${paramName} (isArray: ${widget._wavespeed_is_lora_array}):`, value);
+                        logDebug(`[WaveSpeed] Final LoRA value for ${paramName} (isArray: ${widget._wavespeed_is_lora_array}):`, value);
                     }
 
                     if (widget.type === "string" && typeof value === 'string' && value.trim() === '') {
@@ -1885,7 +2413,10 @@ function clearModelAndParameters(node) {
 
 // Clear model parameters
 function clearModelParameters(node) {
-    console.log("[WaveSpeed] === Starting clearModelParameters ===");
+    logDebug("[WaveSpeed] === Starting clearModelParameters ===");
+
+    // CRITICAL: Save current model to history before clearing
+    saveModelToHistory(node);
 
     // Force clear all parameter states
     node.wavespeedState.parameters = [];
@@ -1902,7 +2433,7 @@ function clearModelParameters(node) {
             widget._wavespeed_dynamic && !widget._wavespeed_base
         );
 
-        console.log(`[WaveSpeed] Widget cleanup: ${baseWidgets.length} base widgets, ${dynamicWidgets.length} dynamic widgets to remove`);
+        logDebug(`[WaveSpeed] Widget cleanup: ${baseWidgets.length} base widgets, ${dynamicWidgets.length} dynamic widgets to remove`);
 
         for (const widget of dynamicWidgets) {
             if (widget.onRemove) {
@@ -1913,9 +2444,12 @@ function clearModelParameters(node) {
         node.widgets = baseWidgets;
     }
 
+    // Clear param_map FIRST - this is crucial to avoid duplicate allocations
+    clearParamMapping(node);
+
     // For the new input filtering system, we need to reset the inputs differently
     if (node._updateVisibleInputs) {
-        console.log("[WaveSpeed] Using new input filtering system");
+        logDebug("[WaveSpeed] Using new input filtering system");
 
         // CRITICAL FIX: Completely reset the input system
         // First, clear all inputs and reset the tracking arrays
@@ -1928,32 +2462,34 @@ function clearModelParameters(node) {
                 input.name && input.name.match(/^param_\d+$/)
             );
 
-            console.log(`[WaveSpeed] Restoring ${placeholderInputs.length} original placeholder inputs`);
+            logDebug(`[WaveSpeed] Restoring ${placeholderInputs.length} original placeholder inputs`);
 
-            // Reset the internal inputs structure to only placeholders
-            node._wavespeed_allInputs = [...placeholderInputs];
+            // ENHANCED: Create fresh copies of placeholder inputs to avoid reference issues
+            const freshPlaceholderInputs = placeholderInputs.map(input => ({
+                name: input.name,
+                type: input.type,
+                link: null,  // Always clear links
+                hidden: true,
+                _wavespeed_placeholder: true
+            }));
 
-            // Mark all placeholders as hidden and clear their links
-            for (const placeholderInput of placeholderInputs) {
-                placeholderInput.link = null;
-                placeholderInput.hidden = true;
-                placeholderInput._wavespeed_placeholder = true;
-            }
+            // Reset the internal inputs structure to only fresh placeholders
+            node._wavespeed_allInputs = freshPlaceholderInputs;
 
             // Store hidden inputs
-            node._wavespeed_hiddenInputs = [...placeholderInputs];
+            node._wavespeed_hiddenInputs = [...freshPlaceholderInputs];
 
             // Update visible inputs (should show none since all are placeholders)
             node._updateVisibleInputs();
         } else {
-            console.warn("[WaveSpeed] No original inputs found, creating fresh placeholder set");
+            logWarn("[WaveSpeed] No original inputs found, creating fresh placeholder set");
             // If no original inputs, we'll rely on the backend structure being recreated
             node._wavespeed_allInputs = [];
             node._wavespeed_hiddenInputs = [];
         }
     } else {
         // Fallback to old method if new system not available
-        console.log("[WaveSpeed] Using fallback input cleanup");
+        logDebug("[WaveSpeed] Using fallback input cleanup");
 
         const baseInputs = node.originalInputs || [];
         const dynamicInputs = node.inputs ? node.inputs.filter(input =>
@@ -1963,7 +2499,7 @@ function clearModelParameters(node) {
             input._wavespeed_placeholder || (input.name && input.name.match(/^param_\d+$/))
         ) : [];
 
-        console.log(`[WaveSpeed] Fallback cleanup: ${dynamicInputs.length} dynamic inputs, preserving ${placeholderInputs.length} placeholder inputs`);
+        logDebug(`[WaveSpeed] Fallback cleanup: ${dynamicInputs.length} dynamic inputs, preserving ${placeholderInputs.length} placeholder inputs`);
 
         // Clean up pairing relationships for dynamic inputs
         for (const input of dynamicInputs) {
@@ -1985,26 +2521,23 @@ function clearModelParameters(node) {
         );
 
         node.inputs = [...baseInputs, ...uniquePlaceholderInputs];
-        console.log(`[WaveSpeed] Reconstructed inputs: ${baseInputs.length} base + ${uniquePlaceholderInputs.length} unique placeholders`);
+        logDebug(`[WaveSpeed] Reconstructed inputs: ${baseInputs.length} base + ${uniquePlaceholderInputs.length} unique placeholders`);
     }
 
     // Clear request_json
     updateRequestJsonWidget(node);
 
-    // Clear param_map - this is crucial to avoid duplicate allocations
-    clearParamMapping(node);
-
-    console.log("[WaveSpeed] === clearModelParameters completed ===");
+    logDebug("[WaveSpeed] === clearModelParameters completed ===");
 
     // CRITICAL FIX: Force node size recalculation after clearing widgets
     if (node.computeSize) {
         const newSize = node.computeSize();
-        console.log(`[WaveSpeed] Setting node size after clearing widgets to: [${newSize[0]}, ${newSize[1]}]`);
+        logDebug(`[WaveSpeed] Setting node size after clearing widgets to: [${newSize[0]}, ${newSize[1]}]`);
         node.setSize(newSize);
 
         // Verify the size was actually set
         setTimeout(() => {
-            console.log(`[WaveSpeed] Node actual size after clearing: [${node.size[0]}, ${node.size[1]}]`);
+            logDebug(`[WaveSpeed] Node actual size after clearing: [${node.size[0]}, ${node.size[1]}]`);
         }, 10);
     }
 
@@ -2013,7 +2546,7 @@ function clearModelParameters(node) {
         if (node.computeSize) {
             const delayedSize = node.computeSize();
             node.setSize(delayedSize);
-            console.log(`[WaveSpeed] Node size updated after delayed cleanup recalculation:`, delayedSize);
+            logDebug(`[WaveSpeed] Node size updated after delayed cleanup recalculation:`, delayedSize);
         }
         if (app.graph) {
             app.graph.setDirtyCanvas(true, true);
@@ -2031,7 +2564,7 @@ function clearParamMapping(node) {
     node.wavespeedState.usedPlaceholders.clear();
     node.wavespeedState.nextPlaceholderIndex = 1;
     updateParamMapWidget(node);
-    console.log("[WaveSpeed] Cleared parameter mapping");
+    logDebug("[WaveSpeed] Cleared parameter mapping");
 }
 
 // Clear all dynamic widgets
@@ -2050,7 +2583,7 @@ function clearDynamicWidgets(node) {
     }
 }
 
-console.log("[WaveSpeed] Dynamic real node extension loaded");
+logDebug("[WaveSpeed] Dynamic real node extension loaded");
 
 // ========================================
 // EXECUTION-TIME TRANSFORMATION (rgthree pattern)
@@ -2059,14 +2592,14 @@ console.log("[WaveSpeed] Dynamic real node extension loaded");
 // Override app.graphToPrompt to intercept and transform dynamic nodes for workflow saving
 const originalGraphToPrompt = app.graphToPrompt;
 app.graphToPrompt = async function() {
-    console.log("[WaveSpeed] === GRAPH TO PROMPT INTERCEPTION (workflow save) ===");
+    logDebug("[WaveSpeed] === GRAPH TO PROMPT INTERCEPTION (workflow save) ===");
 
     // Call original graphToPrompt first
     const result = await originalGraphToPrompt.apply(app, arguments);
 
     // Transform dynamic nodes in the result
     if (result && result.output) {
-        console.log("[WaveSpeed] Transforming dynamic nodes in output...");
+        logDebug("[WaveSpeed] Transforming dynamic nodes in output...");
         result.output = transformDynamicNodesForExecution(result.output);
     }
 
@@ -2076,17 +2609,17 @@ app.graphToPrompt = async function() {
 // Override api.queuePrompt to intercept and transform dynamic nodes for task execution
 const originalQueuePrompt = api.queuePrompt;
 api.queuePrompt = async function(number, prompt, ...args) {
-    console.log("[WaveSpeed] === QUEUE PROMPT INTERCEPTION (task execution) ===");
+    logDebug("[WaveSpeed] === QUEUE PROMPT INTERCEPTION (task execution) ===");
 
     // Transform dynamic nodes in the prompt before sending to server
     if (prompt && prompt.output) {
-        console.log("[WaveSpeed] Transforming dynamic nodes for execution...");
+        logDebug("[WaveSpeed] Transforming dynamic nodes for execution...");
         prompt.output = transformDynamicNodesForExecution(prompt.output);
     }
 
     // Also transform workflow if present (for complete compatibility)
     if (prompt && prompt.workflow && prompt.workflow.nodes) {
-        console.log("[WaveSpeed] Transforming dynamic nodes in workflow...");
+        logDebug("[WaveSpeed] Transforming dynamic nodes in workflow...");
         prompt.workflow = transformDynamicNodesInWorkflow(prompt.workflow);
     }
 
@@ -2112,10 +2645,10 @@ function transformDynamicNodesForExecution(promptOutput) {
             }
 
             if (dynamicState && dynamicState.modelId) {
-                console.log(`[WaveSpeed] Transforming dynamic node ${nodeId} for execution`);
+                logDebug(`[WaveSpeed] Transforming dynamic node ${nodeId} for execution`);
                 const transformedNode = transformDynamicNodeForExecution(nodeData, dynamicState);
                 transformedOutput[nodeId] = transformedNode;
-                console.log(`[WaveSpeed] Node ${nodeId} transformed:`, transformedNode);
+                logDebug(`[WaveSpeed] Node ${nodeId} transformed:`, transformedNode);
             } else {
                 // Keep non-dynamic nodes as-is
                 transformedOutput[nodeId] = nodeData;
@@ -2160,7 +2693,7 @@ function collectDynamicStateFromGraphNode(nodeId) {
             Object.assign(finalParamMapping, state.connectedParams);
         }
 
-        console.log("[WaveSpeed] Collected dynamic state:", {
+        logDebug("[WaveSpeed] Collected dynamic state:", {
             modelId: state.modelId,
             parameterCount: state.parameters.length,
             paramValueCount: Object.keys(currentParamValues).length,
@@ -2182,14 +2715,14 @@ function collectDynamicStateFromGraphNode(nodeId) {
             parameterMetadata: collectParameterMetadata(graphNode)
         };
     } catch (error) {
-        console.warn(`[WaveSpeed] Failed to collect dynamic state from graph node ${nodeId}:`, error);
+        logWarn(`[WaveSpeed] Failed to collect dynamic state from graph node ${nodeId}:`, error);
         return null;
     }
 }
 
 // Transform a single dynamic node to real node format
 function transformDynamicNodeForExecution(nodeData, dynamicState) {
-    console.log("[WaveSpeed] Transforming node with dynamic state:", dynamicState);
+    logDebug("[WaveSpeed] Transforming node with dynamic state:", dynamicState);
 
     // Build the request JSON from parameter values (only widget values, not connected ones)
     const requestJson = {};
@@ -2218,7 +2751,7 @@ function transformDynamicNodeForExecution(nodeData, dynamicState) {
                 // Ensure all items are strings
                 processedValue = value.map(item => String(item));
             }
-            console.log(`[WaveSpeed] Processed array parameter ${cleanParamName} (${metadata.arrayItemType}):`, processedValue);
+            logDebug(`[WaveSpeed] Processed array parameter ${cleanParamName} (${metadata.arrayItemType}):`, processedValue);
         }
 
         requestJson[cleanParamName] = processedValue;
@@ -2236,19 +2769,19 @@ function transformDynamicNodeForExecution(nodeData, dynamicState) {
 
     // CRITICAL: Map dynamic parameter connections to placeholder connections
     if (nodeData.inputs) {
-        console.log("[WaveSpeed] Processing input connections:", Object.keys(nodeData.inputs));
+        logDebug("[WaveSpeed] Processing input connections:", Object.keys(nodeData.inputs));
 
         for (const inputName in nodeData.inputs) {
             const inputValue = nodeData.inputs[inputName];
 
             if (Array.isArray(inputValue)) {
                 // This is a connection
-                console.log(`[WaveSpeed] Found connection: ${inputName} = ${inputValue}`);
+                logDebug(`[WaveSpeed] Found connection: ${inputName} = ${inputValue}`);
 
                 // Check if this is a direct placeholder connection
                 if (inputName.match(/^param_\d+$/)) {
                     transformedInputs[inputName] = inputValue;
-                    console.log(`[WaveSpeed] Direct placeholder connection: ${inputName}`);
+                    logDebug(`[WaveSpeed] Direct placeholder connection: ${inputName}`);
                 } else {
                     // Check if this dynamic parameter should be mapped to a placeholder
                     const cleanInputName = inputName.startsWith('* ') ? inputName.substring(2) : inputName;
@@ -2257,10 +2790,10 @@ function transformDynamicNodeForExecution(nodeData, dynamicState) {
                     const placeholderInfo = paramMap[cleanInputName];
                     if (placeholderInfo && placeholderInfo.placeholder) {
                         transformedInputs[placeholderInfo.placeholder] = inputValue;
-                        console.log(`[WaveSpeed] Mapped dynamic parameter '${inputName}' to placeholder '${placeholderInfo.placeholder}' (${placeholderInfo.type}): ${inputValue}`);
+                        logDebug(`[WaveSpeed] Mapped dynamic parameter '${inputName}' to placeholder '${placeholderInfo.placeholder}' (${placeholderInfo.type}): ${inputValue}`);
                     } else {
                         // No mapping found, this might be an older connection format
-                        console.warn(`[WaveSpeed] No placeholder mapping found for connected parameter: ${inputName}`);
+                        logWarn(`[WaveSpeed] No placeholder mapping found for connected parameter: ${inputName}`);
                     }
                 }
             }
@@ -2273,7 +2806,7 @@ function transformDynamicNodeForExecution(nodeData, dynamicState) {
         _meta: nodeData._meta || { title: "WaveSpeedAI Task Create [WIP]" }
     };
 
-    console.log("[WaveSpeed] Transformation result:", {
+    logDebug("[WaveSpeed] Transformation result:", {
         modelId: dynamicState.modelId,
         requestJsonKeys: Object.keys(requestJson),
         paramMapSize: Object.keys(paramMap).length,
@@ -2307,10 +2840,10 @@ function transformDynamicNodesInWorkflow(workflow) {
             }
 
             if (dynamicState && dynamicState.modelId) {
-                console.log(`[WaveSpeed] Transforming workflow node ${node.id} for execution`);
+                logDebug(`[WaveSpeed] Transforming workflow node ${node.id} for execution`);
                 const transformedNode = transformDynamicNodeInWorkflow(node, dynamicState);
                 transformedWorkflow.nodes[i] = transformedNode;
-                console.log(`[WaveSpeed] Workflow node ${node.id} transformed`);
+                logDebug(`[WaveSpeed] Workflow node ${node.id} transformed`);
             }
         }
     }
@@ -2346,7 +2879,7 @@ function transformDynamicNodeInWorkflow(nodeData, dynamicState) {
     delete transformedNode._wavespeed_dynamic_state;
     delete transformedNode._wavespeed_model_cache;
 
-    console.log("[WaveSpeed] Workflow transformation result:", {
+    logDebug("[WaveSpeed] Workflow transformation result:", {
         modelId: dynamicState.modelId,
         requestJsonKeys: Object.keys(requestJson),
         paramMapSize: Object.keys(paramMap).length,
@@ -2358,11 +2891,11 @@ function transformDynamicNodeInWorkflow(nodeData, dynamicState) {
 
 // Force clean initial state - removes any unexpected inputs on fresh nodes
 function forceCleanInitialState(node) {
-    console.log("[WaveSpeed] === Force cleaning initial state ===");
+    logDebug("[WaveSpeed] === Force cleaning initial state ===");
 
     // Only clean if there are obviously problematic inputs (like duplicate prompts)
     if (node.inputs) {
-        console.log("[WaveSpeed] Initial inputs:", node.inputs.map(i => ({ name: i.name, hidden: i.hidden })));
+        logDebug("[WaveSpeed] Initial inputs:", node.inputs.map(i => ({ name: i.name, hidden: i.hidden })));
 
         // Look for duplicate non-placeholder inputs (like multiple "prompt" inputs)
         const nonPlaceholderInputs = node.inputs.filter(input =>
@@ -2373,7 +2906,7 @@ function forceCleanInitialState(node) {
         const duplicateNames = inputNames.filter((name, index) => inputNames.indexOf(name) !== index);
 
         if (duplicateNames.length > 0) {
-            console.log(`[WaveSpeed] Found duplicate inputs:`, duplicateNames);
+            logDebug(`[WaveSpeed] Found duplicate inputs:`, duplicateNames);
 
             // Remove only the duplicate instances, keep one of each
             const seenNames = new Set();
@@ -2383,7 +2916,7 @@ function forceCleanInitialState(node) {
                 }
 
                 if (seenNames.has(input.name)) {
-                    console.log(`[WaveSpeed] Removing duplicate input: ${input.name}`);
+                    logDebug(`[WaveSpeed] Removing duplicate input: ${input.name}`);
                     return false; // Remove duplicate
                 }
 
@@ -2391,9 +2924,9 @@ function forceCleanInitialState(node) {
                 return true; // Keep first instance
             });
 
-            console.log(`[WaveSpeed] After duplicate removal: ${node.inputs.length} inputs`);
+            logDebug(`[WaveSpeed] After duplicate removal: ${node.inputs.length} inputs`);
         }
     }
 
-    console.log("[WaveSpeed] === Initial state cleanup completed ===");
+    logDebug("[WaveSpeed] === Initial state cleanup completed ===");
 }

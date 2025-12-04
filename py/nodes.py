@@ -1,4 +1,5 @@
 import os
+import json
 import requests
 import configparser
 import folder_paths
@@ -531,6 +532,140 @@ class UploadAudio:
         os.remove(save_path)
         return (audio_url,)
 
+class _ListMergerMixin:
+    """Utility mixin to flatten nested values into a string list."""
+
+    def _flatten_values(self, values):
+        result = []
+
+        def extend(val):
+            if val is None:
+                return
+            if isinstance(val, (list, tuple, set)):
+                for item in val:
+                    extend(item)
+            elif isinstance(val, str):
+                text = val.strip()
+                if not text:
+                    return
+                # Try JSON-style list first
+                if (text.startswith("[") and text.endswith("]")):
+                    try:
+                        parsed = json.loads(text)
+                        if isinstance(parsed, (list, tuple, set)):
+                            extend(parsed)
+                            return
+                    except Exception:
+                        pass
+                # Fallback: comma-separated values
+                if "," in text:
+                    parts = [p.strip() for p in text.split(",") if p.strip()]
+                    for p in parts:
+                        result.append(p)
+                    return
+                result.append(text)
+            else:
+                text = str(val).strip()
+                if text:
+                    result.append(text)
+
+        for v in values:
+            extend(v)
+        return result
+
+
+class MediaImagesToList(_ListMergerMixin):
+    """
+    Merge multiple image URLs/lists into a single image list.
+    Suitable for aggregating outputs from multiple Upload Image nodes or manual URLs.
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "optional": {
+                "image_urls": ("STRING", {"default": "", "multiline": False, "tooltip": "Can directly connect to upstream imageUrls list for cascading"}),
+                "image_url_1": ("STRING", {"default": "", "multiline": False}),
+                "image_url_2": ("STRING", {"default": "", "multiline": False}),
+                "image_url_3": ("STRING", {"default": "", "multiline": False}),
+                "image_url_4": ("STRING", {"default": "", "multiline": False}),
+                "image_url_5": ("STRING", {"default": "", "multiline": False}),
+            }
+        }
+
+    RETURN_TYPES = ("STRING", "STRING")
+    RETURN_NAMES = ("firstImageUrl", "imageUrls")
+
+    FUNCTION = "merge"
+    CATEGORY = "WaveSpeedAI"
+
+    def merge(self, image_urls="", image_url_1="", image_url_2="", image_url_3="", image_url_4="", image_url_5=""):
+        image_urls = self._flatten_values([image_urls, image_url_1, image_url_2, image_url_3, image_url_4, image_url_5])
+        first_image = image_urls[0] if image_urls else ""
+        return (first_image, image_urls)
+
+
+class MediaVideosToList(_ListMergerMixin):
+    """
+    Merge multiple video URLs/lists into a single video list.
+    Suitable for aggregating outputs from multiple Upload Video nodes or manual URLs.
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "optional": {
+                "video_urls": ("STRING", {"default": "", "multiline": False, "tooltip": "Can directly connect to upstream videoUrls list for cascading"}),
+                "video_url_1": ("STRING", {"default": "", "multiline": False}),
+                "video_url_2": ("STRING", {"default": "", "multiline": False}),
+                "video_url_3": ("STRING", {"default": "", "multiline": False}),
+                "video_url_4": ("STRING", {"default": "", "multiline": False}),
+                "video_url_5": ("STRING", {"default": "", "multiline": False}),
+            }
+        }
+
+    RETURN_TYPES = ("STRING", "STRING")
+    RETURN_NAMES = ("firstVideoUrl", "videoUrls")
+
+    FUNCTION = "merge"
+    CATEGORY = "WaveSpeedAI"
+
+    def merge(self, video_urls="", video_url_1="", video_url_2="", video_url_3="", video_url_4="", video_url_5=""):
+        video_urls = self._flatten_values([video_urls, video_url_1, video_url_2, video_url_3, video_url_4, video_url_5])
+        first_video = video_urls[0] if video_urls else ""
+        return (first_video, video_urls)
+
+
+class MediaAudiosToList(_ListMergerMixin):
+    """
+    Merge multiple audio URLs/lists into a single audio list.
+    Suitable for aggregating outputs from multiple Upload Audio nodes or manual URLs.
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "optional": {
+                "audio_urls": ("STRING", {"default": "", "multiline": False, "tooltip": "Can directly connect to upstream audioUrls list for cascading"}),
+                "audio_url_1": ("STRING", {"default": "", "multiline": False}),
+                "audio_url_2": ("STRING", {"default": "", "multiline": False}),
+                "audio_url_3": ("STRING", {"default": "", "multiline": False}),
+                "audio_url_4": ("STRING", {"default": "", "multiline": False}),
+                "audio_url_5": ("STRING", {"default": "", "multiline": False}),
+            }
+        }
+
+    RETURN_TYPES = ("STRING", "STRING")
+    RETURN_NAMES = ("firstAudioUrl", "audioUrls")
+
+    FUNCTION = "merge"
+    CATEGORY = "WaveSpeedAI"
+
+    def merge(self, audio_urls="", audio_url_1="", audio_url_2="", audio_url_3="", audio_url_4="", audio_url_5=""):
+        audio_urls = self._flatten_values([audio_urls, audio_url_1, audio_url_2, audio_url_3, audio_url_4, audio_url_5])
+        first_audio = audio_urls[0] if audio_urls else ""
+        return (first_audio, audio_urls)
+
 NODE_CLASS_MAPPINGS = {
     'WaveSpeedAI Client': WaveSpeedAIAPIClient,
     'WaveSpeedAI Loras Config': CustomLoras,
@@ -541,6 +676,9 @@ NODE_CLASS_MAPPINGS = {
     'WaveSpeedAI Upload Image': UploadImage,
     'WaveSpeedAI Upload Video': UploadVideo,
     'WaveSpeedAI Upload Audio': UploadAudio,
+    'WaveSpeedAI Media Images To List': MediaImagesToList,
+    'WaveSpeedAI Media Videos To List': MediaVideosToList,
+    'WaveSpeedAI Media Audios To List': MediaAudiosToList,
     'WaveSpeedAI Task Create': WaveSpeedTaskCreateDynamic,
     'WaveSpeedAI Task Submit': WaveSpeedTaskSubmit,
     'WaveSpeedAI Task Status': WaveSpeedTaskStatus,
@@ -556,6 +694,9 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     'WaveSpeedAI Upload Image': 'WaveSpeedAI Upload Image',
     'WaveSpeedAI Upload Video': 'WaveSpeedAI Upload Video',
     'WaveSpeedAI Upload Audio': 'WaveSpeedAI Upload Audio',
+    'WaveSpeedAI Media Images To List': 'WaveSpeedAI Multi Image To List',
+    'WaveSpeedAI Media Videos To List': 'WaveSpeedAI Multi Video To List',
+    'WaveSpeedAI Media Audios To List': 'WaveSpeedAI Multi Audio To List',
     'WaveSpeedAI Task Create': 'WaveSpeedAI Task Create [WIP]',
     'WaveSpeedAI Task Submit': 'WaveSpeedAI Task Submit [WIP]',
     'WaveSpeedAI Task Status': 'WaveSpeedAI Task Status [WIP]',

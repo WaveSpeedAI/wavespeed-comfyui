@@ -188,12 +188,14 @@ class WaveSpeedOutputProcessor:
             outputs: List of outputs from API response
 
         Returns:
-            tuple: (task_id, video_url, image, audio_url, text)
+            tuple: (task_id, video_url, image, audio_url, text, first_image_url, image_urls)
         """
         video_url = ""
         images = []
         audio_url = ""
         text = ""
+        first_image_url = ""
+        image_urls = []
 
         if outputs and len(outputs) > 0:
             # Try to determine output types and separate them
@@ -219,7 +221,10 @@ class WaveSpeedOutputProcessor:
 
             # Don't auto-assign first output as text - text should only be actual generated text content
         image = imageurl2tensor(images)
-        return (task_id, video_url, image, audio_url, text)
+        if images:
+            first_image_url = images[0]
+            image_urls = images
+        return (task_id, video_url, image, audio_url, text, first_image_url, image_urls)
 
 class DynamicRequest:
     """
@@ -412,8 +417,8 @@ class WaveSpeedTaskSubmit:
             }
         }
 
-    RETURN_TYPES = ("STRING", "STRING", "IMAGE", "STRING", "STRING")
-    RETURN_NAMES = ("task_id", "video_url", "image", "audio_url", "text")
+    RETURN_TYPES = ("STRING", "STRING", "IMAGE", "STRING", "STRING", "STRING", "STRING")
+    RETURN_NAMES = ("task_id", "video_url", "image", "audio_url", "text", "firstImageUrl", "imageUrls")
 
     CATEGORY = "WaveSpeedAI"
     FUNCTION = "submit_task"
@@ -431,7 +436,7 @@ class WaveSpeedTaskSubmit:
             poll_interval: Polling interval
 
         Returns:
-            tuple: (task_id, status, result, outputs, first_output, images, videos, audios)
+            tuple: (task_id, video_url, image, audio_url, text, firstImageUrl, imageUrls)
         """
 
         if not task_info:
@@ -471,18 +476,6 @@ class WaveSpeedTaskSubmit:
             task_id = response.get("id", "")
             status = response.get("status", "completed")
             outputs = response.get("outputs", [])
-
-            # Build result data
-            result_data = {
-                "task_id": task_id,
-                "model_uuid": model_uuid,
-                "input_parameters": request_json,
-                "status": status,
-                "created_at": response.get("created_at"),
-                "outputs": outputs,
-                "timings": response.get("timings"),
-                "has_nsfw_contents": response.get("has_nsfw_contents"),
-            }
 
             # Use shared output processor
             return WaveSpeedOutputProcessor.process_outputs(task_id, outputs)
@@ -530,8 +523,8 @@ class WaveSpeedTaskStatus:
             }
         }
 
-    RETURN_TYPES = ("STRING", "STRING", "IMAGE", "STRING", "STRING")
-    RETURN_NAMES = ("task_id", "video_url", "image", "audio_url", "text")
+    RETURN_TYPES = ("STRING", "STRING", "IMAGE", "STRING", "STRING", "STRING", "STRING")
+    RETURN_NAMES = ("task_id", "video_url", "image", "audio_url", "text", "firstImageUrl", "imageUrls")
 
     CATEGORY = "WaveSpeedAI"
     FUNCTION = "check_status"
@@ -548,7 +541,7 @@ class WaveSpeedTaskStatus:
             wait_for_completion: Whether to wait for completion
 
         Returns:
-            tuple: (task_id, video_url, image, audio_url, text)
+            tuple: (task_id, video_url, image, audio_url, text, firstImageUrl, imageUrls)
         """
 
         if not task_id or task_id.strip() == "":
@@ -588,7 +581,7 @@ class WaveSpeedTaskStatus:
                 progress_states = ["created", "processing", "pending", "running", "queued"]
                 if status.lower() in progress_states:
                     # Return empty outputs for in-progress tasks
-                    return (task_id, "", None, "", "")
+                    return (task_id, "", None, "", "", "", [])
                 else:
                     # Unknown status, throw error
                     raise Exception(f"Unknown task status: {status}")
