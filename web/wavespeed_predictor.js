@@ -272,7 +272,8 @@ async function createBasicUI(node, apiModule, utilsModule) {
         preloadContainer.style.color = '#4a9eff';
         preloadContainer.style.textAlign = 'center';
 
-        node.addDOMWidget('preload_indicator', 'div', preloadContainer, { serialize: false });
+        // Add as DOM widget
+        const preloadWidget = node.addDOMWidget('preload_indicator', 'div', preloadContainer, { serialize: false });
 
         try {
             const preloadData = await apiModule.preloadAllModels((progress) => {
@@ -283,26 +284,64 @@ async function createBasicUI(node, apiModule, utilsModule) {
                 }
             });
 
+            console.log('[WaveSpeed Predictor] Preload result:', preloadData);
+
             if (preloadData) {
                 node.wavespeedState.categoryList = preloadData.categories;
                 node.wavespeedState.allModels = preloadData.flatModels;
                 node.wavespeedState.modelsByCategory = preloadData.modelsByCategory;
+                
+                console.log('[WaveSpeed Predictor] Categories loaded:', node.wavespeedState.categoryList?.length);
+                console.log('[WaveSpeed Predictor] Models loaded:', node.wavespeedState.allModels?.length);
+            } else {
+                console.error('[WaveSpeed Predictor] Preload returned null');
             }
         } catch (error) {
             console.error('[WaveSpeed Predictor] Preload failed:', error);
             preloadContainer.textContent = '❌ Failed to load models';
         }
 
-        // Remove loading indicator
+        // Remove loading indicator - compatible with both Canvas and Vue rendering modes
+        // Strategy: Remove from widgets array first, then ensure DOM cleanup with multiple fallbacks
         if (node.widgets) {
             const tempIdx = node.widgets.findIndex(w => w.name === 'preload_indicator');
             if (tempIdx > -1) {
+                const widget = node.widgets[tempIdx];
                 node.widgets.splice(tempIdx, 1);
+                
+                // Force remove widget's DOM element
+                if (widget.element && widget.element.parentNode) {
+                    widget.element.parentNode.removeChild(widget.element);
+                }
             }
         }
+        
+        // DOM cleanup with fallbacks for both rendering modes
+        // Immediate removal (works if already mounted)
         if (preloadContainer.parentNode) {
             preloadContainer.parentNode.removeChild(preloadContainer);
         }
+        
+        // Delayed removal (handles async rendering in Canvas mode)
+        setTimeout(() => {
+            if (preloadContainer.parentNode) {
+                preloadContainer.parentNode.removeChild(preloadContainer);
+            }
+            // Also search for any orphaned preload indicators in the DOM
+            const orphans = document.querySelectorAll('.wavespeed-loading-overlay, [class*="preload"]');
+            orphans.forEach(el => {
+                if (el.textContent && el.textContent.includes('Loaded') && el.textContent.includes('models')) {
+                    el.remove();
+                }
+            });
+        }, 100);
+        
+        // Additional cleanup after next frame
+        requestAnimationFrame(() => {
+            if (preloadContainer.parentNode) {
+                preloadContainer.parentNode.removeChild(preloadContainer);
+            }
+        });
 
         // Create main container - contains all UI elements
         const mainContainer = document.createElement('div');
@@ -311,6 +350,8 @@ async function createBasicUI(node, apiModule, utilsModule) {
         mainContainer.style.flexDirection = 'column';
         mainContainer.style.gap = '6px';
         mainContainer.style.padding = '6px';
+        mainContainer.style.minHeight = 'auto';  // Remove fixed minimum height
+        mainContainer.style.backgroundColor = '#2a2a2a';  // Add background for visibility
 
         // 1. Header: title + refresh button
         const header = document.createElement('div');
@@ -397,15 +438,21 @@ async function createBasicUI(node, apiModule, utilsModule) {
         tabsWrapper.appendChild(allTab);
 
         // Add category tabs
+        console.log('[WaveSpeed Predictor] Creating category tabs, categoryList:', node.wavespeedState.categoryList);
         if (node.wavespeedState.categoryList && node.wavespeedState.categoryList.length > 0) {
             for (const category of node.wavespeedState.categoryList) {
                 const tab = createCategoryTabButton(category.name, category.value, false, node, utilsModule, tabsWrapper);
                 tabsWrapper.appendChild(tab);
             }
+        } else {
+            console.warn('[WaveSpeed Predictor] No categories to display');
         }
 
         categoryTabsContainer.appendChild(tabsWrapper);
         mainContainer.appendChild(categoryTabsContainer);
+        
+        console.log('[WaveSpeed Predictor] mainContainer children:', mainContainer.children.length);
+        console.log('[WaveSpeed Predictor] tabsWrapper children:', tabsWrapper.children.length);
         
         // Save reference for later updates
         node._categoryTabsWrapper = tabsWrapper;
@@ -440,17 +487,25 @@ async function createBasicUI(node, apiModule, utilsModule) {
         // Add main container as single DOM widget (serialize: false to prevent ComfyUI auto-serialization)
         const mainWidget = node.addDOMWidget('wavespeed_main', 'div', mainContainer, { serialize: false });
 
+        console.log('[WaveSpeed Predictor] mainWidget created:', mainWidget);
+        console.log('[WaveSpeed Predictor] mainWidget.element:', mainWidget.element);
+        console.log('[WaveSpeed Predictor] mainContainer.parentNode (immediate):', mainContainer.parentNode);
+        
+        // Wait for DOM to be mounted in Canvas mode
+        await new Promise(resolve => setTimeout(resolve, 100));
+        console.log('[WaveSpeed Predictor] mainContainer.parentNode (after 100ms):', mainContainer.parentNode);
+        
+        await new Promise(resolve => requestAnimationFrame(resolve));
+        console.log('[WaveSpeed Predictor] mainContainer.parentNode (after RAF):', mainContainer.parentNode);
+
         // CRITICAL FIX: Set all flags explicitly
         mainWidget._wavespeed_base = true;
         mainWidget._wavespeed_no_input = true;  // Base widget has no input slot
         mainWidget._wavespeed_dynamic = false;  // Base widget is not dynamic
-        mainWidget._wavespeed_hidden = false;   // Not hidden (just type='hidden' for positioning)
+        mainWidget._wavespeed_hidden = false;   // Not hidden
 
-        // CRITICAL FIX: Set type to 'hidden' to prevent LiteGraph from including it in input position calculation
-        // The base widget is a UI container that should not participate in input slot positioning
-        // Setting type='hidden' makes LiteGraph skip it when calculating input positions,
-        // while the DOM element still renders normally because DOM widgets render independently
-        mainWidget.type = 'hidden';
+        // DO NOT set type='hidden' - it causes display:none in Canvas mode
+        // Instead, rely on _wavespeed_base flag in computeSize to exclude from height calculation
 
         node._mainContainer = mainContainer;
 
@@ -659,6 +714,28 @@ async function loadModelParameters(node, modelValue, apiModule, isRestoring = fa
             // Only clean up tooltips that are mounted to body (not managed by Vue)
             const bodyTooltips = document.querySelectorAll('.wavespeed-tooltip');
             bodyTooltips.forEach(t => t.remove());
+
+            // CRITICAL FIX: In Canvas mode, clean up DOM elements of dynamic widgets
+            // Canvas mode doesn't automatically remove DOM when widget is removed from array
+            // In Vue mode, Vue manages the DOM, so we should NOT remove elements manually
+            const isCanvasMode = !LiteGraph.vueNodesMode;
+            console.log('[WaveSpeed] Cleaning widgets, isCanvasMode:', isCanvasMode);
+            console.log('[WaveSpeed] Widgets before cleanup:', node.widgets?.length);
+            
+            if (isCanvasMode) {
+                let removedCount = 0;
+                for (const widget of node.widgets) {
+                    if (widget._wavespeed_dynamic && widget.element) {
+                        // Remove DOM element if it has a parent
+                        if (widget.element.parentNode) {
+                            console.log('[WaveSpeed] Removing DOM for widget:', widget.name);
+                            widget.element.parentNode.removeChild(widget.element);
+                            removedCount++;
+                        }
+                    }
+                }
+                console.log('[WaveSpeed] Removed', removedCount, 'DOM elements in Canvas mode');
+            }
 
             // Filter widgets array to remove dynamic widgets
             node.widgets = node.widgets.filter(w =>

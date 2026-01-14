@@ -4,7 +4,13 @@
 
 import { getMediaType, getOriginalApiType } from './parameters.js';
 import { createFilePreview, createLoadingPreview, createErrorPreview, createUploadButton, uploadToWaveSpeed } from './media.js';
-import { showSizeToast } from './dom_widgets.js';
+import { 
+    showSizeToast,
+    createComboDomWidget,
+    createToggleDomWidget,
+    createNumberDomWidget,
+    createTextDomWidget
+} from './dom_widgets.js';
 
 // Helper: Create options for textarea-based DOM widgets (for ComfyUI auto-serialization)
 function textareaOptions(getTextarea, onSet) {
@@ -1983,28 +1989,12 @@ export function createParameterWidget(node, param) {
     }
 
     // PRIORITY FIX: Check COMBO type first (including size with enum)
-    // This allows size parameters with fixed enum values to use dropdown instead of range widget
+    // CRITICAL FIX: Use DOM widget to avoid Vue caching issues
+    // Issue: In Vue mode, when switching models with same parameter names,
+    //   Vue caches widget components, causing getComponent() to use stale widget.type
+    // Solution: Always use DOM widgets (works in both Canvas and Vue modes)
     if (param.type === "COMBO" && param.options && param.options.length > 0) {
-        const widget = node.addWidget("combo", paramName, param.default || param.options[0],
-            (value) => {
-                node.wavespeedState.parameterValues[param.name] = value;
-                updateRequestJson(node);
-            },
-            { values: param.options || [] }
-        );
-
-        widget._wavespeed_dynamic = true;
-        widget._wavespeed_param = param.name;
-
-        // Initialize parameter value
-        const existingValue = node.wavespeedState.parameterValues[param.name];
-        if (existingValue !== undefined) {
-            widget.value = existingValue;
-        } else {
-            node.wavespeedState.parameterValues[param.name] = widget.value !== undefined ? widget.value : (param.default || param.options[0] || "");
-        }
-
-        return widget;
+        return createComboDomWidget(node, param);
     }
 
     // Check if size parameter (only for range-type size, not COMBO)
@@ -2036,101 +2026,17 @@ export function createParameterWidget(node, param) {
         // Seed parameters use special seed widget with fixed/random control
         widget = createSeedWidget(node, param);
     } else if (param.type === "INT") {
-        let defaultValue;
-        if (param.default !== undefined && param.default !== null && param.default !== '') {
-            defaultValue = Math.round(param.default);
-        } else if (param.min !== undefined && param.min !== null) {
-            defaultValue = Math.round(param.min);
-        } else {
-            defaultValue = 0;
-        }
-        // CRITICAL FIX: Use API's minimum/maximum constraints, not hardcoded defaults
-        // If param.min/max is undefined, use null to indicate no constraint (let API validate)
-        // But widget needs numeric values, so use -Infinity/Infinity for UI, but don't enforce in callback
-        const min = param.min !== undefined ? param.min : null;
-        const max = param.max !== undefined ? param.max : null;
-        const useSlider = param.uiComponent === 'slider';
-
-        // Widget requires numeric min/max, use safe defaults for UI
-        const widgetMin = min !== null ? min : -Infinity;
-        const widgetMax = max !== null ? max : Infinity;
-
-        if (min !== null) defaultValue = Math.max(min, defaultValue);
-        if (max !== null) defaultValue = Math.min(max, defaultValue);
-        widget = node.addWidget(useSlider ? "slider" : "number", widgetName, defaultValue,
-            (value) => {
-                value = typeof value === 'string' ? parseInt(value) : Math.round(value);
-                if (isNaN(value)) value = defaultValue;
-                // Only enforce min/max if they are defined from API
-                if (min !== null) value = Math.max(min, value);
-                if (max !== null) value = Math.min(max, value);
-                value = Math.round(value);
-                node.wavespeedState.parameterValues[param.name] = value;
-                updateRequestJson(node);
-            },
-            { min: widgetMin, max: widgetMax, step: 1, precision: 0 }
-        );
-
-        if (useSlider) {
-            // Pass widgetMin/widgetMax (numeric values) to interceptSliderInput
-            interceptSliderInput(widget, widgetMin, widgetMax, 'INT', defaultValue);
-        }
+        // Use DOM widget (works in both Canvas and Vue modes, avoids Vue caching issues)
+        widget = createNumberDomWidget(node, param, false);
     } else if (param.type === "FLOAT") {
-        let defaultValue;
-        if (param.default !== undefined && param.default !== null && param.default !== '') {
-            defaultValue = param.default;
-        } else if (param.min !== undefined && param.min !== null) {
-            defaultValue = param.min;
-        } else {
-            defaultValue = 0.0;
-        }
-        // CRITICAL FIX: Use API's minimum/maximum constraints, not hardcoded defaults
-        // If param.min/max is undefined, use null to indicate no constraint (let API validate)
-        const min = param.min !== undefined ? param.min : null;
-        const max = param.max !== undefined ? param.max : null;
-        const step = param.step !== undefined ? param.step : 0.1;
-        const useSlider = param.uiComponent === 'slider';
-
-        // Widget requires numeric min/max, use safe defaults for UI
-        const widgetMin = min !== null ? min : -Infinity;
-        const widgetMax = max !== null ? max : Infinity;
-
-        if (min !== null) defaultValue = Math.max(min, defaultValue);
-        if (max !== null) defaultValue = Math.min(max, defaultValue);
-        widget = node.addWidget(useSlider ? "slider" : "number", widgetName, defaultValue,
-            (value) => {
-                value = typeof value === 'string' ? parseFloat(value) : value;
-                if (isNaN(value)) value = defaultValue;
-                // Only enforce min/max if they are defined from API
-                if (min !== null) value = Math.max(min, value);
-                if (max !== null) value = Math.min(max, value);
-                value = Math.round(value * 10) / 10;
-                node.wavespeedState.parameterValues[param.name] = value;
-                updateRequestJson(node);
-            },
-            { min: widgetMin, max: widgetMax, step: step }
-        );
-
-        if (useSlider) {
-            // Pass widgetMin/widgetMax (numeric values) to interceptSliderInput
-            interceptSliderInput(widget, widgetMin, widgetMax, 'FLOAT', defaultValue);
-        }
+        // Use DOM widget (works in both Canvas and Vue modes, avoids Vue caching issues)
+        widget = createNumberDomWidget(node, param, true);
     } else if (param.type === "BOOLEAN") {
-        widget = node.addWidget("toggle", widgetName, param.default || false,
-            (value) => {
-                node.wavespeedState.parameterValues[param.name] = value;
-                updateRequestJson(node);
-            },
-            {}
-        );
+        // Use DOM widget (works in both Canvas and Vue modes, avoids Vue caching issues)
+        widget = createToggleDomWidget(node, param);
     } else {
-        widget = node.addWidget("text", widgetName, param.default || "",
-            (value) => {
-                node.wavespeedState.parameterValues[param.name] = value;
-                updateRequestJson(node);
-            },
-            {}
-        );
+        // Use DOM widget (works in both Canvas and Vue modes, avoids Vue caching issues)
+        widget = createTextDomWidget(node, param);
     }
 
     if (widget) {

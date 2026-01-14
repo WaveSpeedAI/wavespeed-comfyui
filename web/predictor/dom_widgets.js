@@ -356,3 +356,361 @@ export function showSizeToast(message, anchorEl) {
         }
     }, 1800);
 }
+
+// Create COMBO (dropdown) DOM widget
+export function createComboDomWidget(node, param) {
+    const options = param.options || [];
+    const defaultValue = param.default || (options.length > 0 ? options[0] : '');
+    
+    // Create container with horizontal layout (single-row, matching other widgets)
+    const container = document.createElement('div');
+    container.style.display = 'flex';
+    container.style.alignItems = 'center';
+    container.style.justifyContent = 'space-between';
+    container.style.width = '100%';
+    container.style.gap = '8px';
+    container.style.marginBottom = '4px';
+    
+    // Label (blue color matching media widgets)
+    const label = createLabel(param.displayName || param.name, param.required, param.description);
+    label.style.color = '#4a9eff';
+    label.style.fontSize = '12px';
+    label.style.fontWeight = '600';
+    label.style.minWidth = 'max-content';
+    label.style.flexShrink = '0';
+    
+    // Select element (fixed width on right side)
+    const select = document.createElement('select');
+    select.style.minWidth = '150px';
+    select.style.maxWidth = '300px';
+    select.style.padding = '5px 10px';
+    select.style.backgroundColor = '#2a2a2a';
+    select.style.color = '#e0e0e0';
+    select.style.border = '1px solid #444';
+    select.style.borderRadius = '4px';
+    select.style.fontSize = '13px';
+    select.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    select.style.cursor = 'pointer';
+    select.style.boxSizing = 'border-box';
+    
+    for (const opt of options) {
+        const option = document.createElement('option');
+        option.value = opt;
+        option.textContent = opt;
+        select.appendChild(option);
+    }
+    
+    select.value = defaultValue;
+    
+    const onChange = (value) => {
+        node.wavespeedState.parameterValues[param.name] = value;
+        // Import and call updateRequestJson
+        import('./widgets.js').then(module => {
+            module.updateRequestJson(node);
+        });
+    };
+    
+    select.addEventListener('change', (e) => {
+        onChange(e.target.value);
+    });
+    
+    container.appendChild(label);
+    container.appendChild(select);
+    
+    const widget = node.addDOMWidget(param.name, 'div', container, { serialize: false });
+    widget._wavespeed_dynamic = true;
+    widget._wavespeed_param = param.name;
+    
+    // Initialize parameter value
+    const existingValue = node.wavespeedState.parameterValues[param.name];
+    if (existingValue !== undefined) {
+        select.value = existingValue;
+    } else {
+        node.wavespeedState.parameterValues[param.name] = defaultValue;
+    }
+    
+    // Add restoreValue method for workflow restoration
+    widget.restoreValue = (value) => {
+        select.value = value;
+        onChange(value);
+    };
+    
+    widget.inputEl = select;
+    
+    return widget;
+}
+
+// Create BOOLEAN (toggle) DOM widget
+export function createToggleDomWidget(node, param) {
+    // Create container with horizontal layout (single row, button on right)
+    const container = document.createElement('div');
+    container.style.display = 'flex';
+    container.style.alignItems = 'center';
+    container.style.justifyContent = 'space-between';
+    container.style.gap = '8px';
+    container.style.width = '100%';
+    container.style.marginBottom = '4px';
+    
+    // Label (blue color matching media widgets)
+    const label = createLabel(param.displayName || param.name, param.required, param.description);
+    label.style.color = '#4a9eff';
+    label.style.fontSize = '12px';
+    label.style.fontWeight = '600';
+    label.style.minWidth = 'max-content';
+    label.style.flexShrink = '0';
+    
+    // Toggle switch (no background box, just the switch)
+    const toggleSwitch = document.createElement('label');
+    toggleSwitch.style.position = 'relative';
+    toggleSwitch.style.display = 'inline-block';
+    toggleSwitch.style.width = '44px';
+    toggleSwitch.style.height = '24px';
+    toggleSwitch.style.cursor = 'pointer';
+    toggleSwitch.style.flexShrink = '0';
+    
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = param.default || false;
+    checkbox.style.opacity = '0';
+    checkbox.style.width = '0';
+    checkbox.style.height = '0';
+    
+    const slider = document.createElement('span');
+    slider.style.position = 'absolute';
+    slider.style.top = '0';
+    slider.style.left = '0';
+    slider.style.right = '0';
+    slider.style.bottom = '0';
+    slider.style.backgroundColor = checkbox.checked ? '#4a9eff' : '#3a3f47';
+    slider.style.borderRadius = '24px';
+    slider.style.transition = 'background-color 0.2s';
+    
+    const knob = document.createElement('span');
+    knob.style.position = 'absolute';
+    knob.style.content = '""';
+    knob.style.height = '18px';
+    knob.style.width = '18px';
+    knob.style.left = checkbox.checked ? '23px' : '3px';
+    knob.style.bottom = '3px';
+    knob.style.backgroundColor = 'white';
+    knob.style.borderRadius = '50%';
+    knob.style.transition = 'left 0.2s';
+    
+    slider.appendChild(knob);
+    toggleSwitch.appendChild(checkbox);
+    toggleSwitch.appendChild(slider);
+    
+    const onChange = (value) => {
+        node.wavespeedState.parameterValues[param.name] = value;
+        slider.style.backgroundColor = value ? '#4a9eff' : '#3a3f47';
+        knob.style.left = value ? '23px' : '3px';
+        // Import and call updateRequestJson
+        import('./widgets.js').then(module => {
+            module.updateRequestJson(node);
+        });
+    };
+    
+    checkbox.addEventListener('change', (e) => {
+        onChange(e.target.checked);
+    });
+    
+    container.appendChild(label);
+    container.appendChild(toggleSwitch);
+    
+    const widget = node.addDOMWidget(param.name, 'div', container, { serialize: false });
+    widget._wavespeed_dynamic = true;
+    widget._wavespeed_param = param.name;
+    
+    // Initialize parameter value
+    const existingValue = node.wavespeedState.parameterValues[param.name];
+    if (existingValue !== undefined) {
+        checkbox.checked = existingValue;
+        onChange(existingValue);
+    } else {
+        node.wavespeedState.parameterValues[param.name] = checkbox.checked;
+    }
+    
+    // Add restoreValue method for workflow restoration
+    widget.restoreValue = (value) => {
+        checkbox.checked = value;
+        onChange(value);
+    };
+    
+    // Store reference for external access
+    widget.inputEl = checkbox;
+    
+    return widget;
+}
+
+// Create INT/FLOAT number DOM widget
+export function createNumberDomWidget(node, param, isFloat = false) {
+    const min = param.min !== undefined ? param.min : null;
+    const max = param.max !== undefined ? param.max : null;
+    const step = isFloat ? (param.step !== undefined ? param.step : 0.1) : 1;
+    
+    let defaultValue;
+    if (param.default !== undefined && param.default !== null && param.default !== '') {
+        defaultValue = isFloat ? param.default : Math.round(param.default);
+    } else if (min !== null) {
+        defaultValue = isFloat ? min : Math.round(min);
+    } else {
+        defaultValue = isFloat ? 0.0 : 0;
+    }
+    
+    if (min !== null) defaultValue = Math.max(min, defaultValue);
+    if (max !== null) defaultValue = Math.min(max, defaultValue);
+    if (!isFloat) defaultValue = Math.round(defaultValue);
+    
+    // Create container with horizontal layout (single row, input on right)
+    const container = document.createElement('div');
+    container.style.display = 'flex';
+    container.style.alignItems = 'center';
+    container.style.justifyContent = 'space-between';
+    container.style.gap = '8px';
+    container.style.width = '100%';
+    container.style.marginBottom = '4px';
+    
+    // Label (blue color matching media widgets)
+    const label = createLabel(param.displayName || param.name, param.required, param.description);
+    label.style.color = '#4a9eff';
+    label.style.fontSize = '12px';
+    label.style.fontWeight = '600';
+    label.style.minWidth = 'max-content';
+    label.style.flexShrink = '0';
+    
+    // Input element (fixed width on right side)
+    const input = document.createElement('input');
+    input.type = 'number';
+    if (min !== null) input.min = String(min);
+    if (max !== null) input.max = String(max);
+    input.step = String(step);
+    input.value = String(defaultValue);
+    input.style.minWidth = '100px';
+    input.style.maxWidth = '200px';
+    input.style.padding = '5px 10px';
+    input.style.backgroundColor = '#2a2a2a';
+    input.style.color = '#e0e0e0';
+    input.style.border = '1px solid #444';
+    input.style.borderRadius = '4px';
+    input.style.fontSize = '13px';
+    input.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    input.style.boxSizing = 'border-box';
+    
+    const onChange = (value) => {
+        let parsed = value === '' ? defaultValue : (isFloat ? parseFloat(value) : parseInt(value));
+        if (isNaN(parsed)) parsed = defaultValue;
+        if (min !== null) parsed = Math.max(min, parsed);
+        if (max !== null) parsed = Math.min(max, parsed);
+        if (!isFloat) parsed = Math.round(parsed);
+        
+        node.wavespeedState.parameterValues[param.name] = parsed;
+        // Import and call updateRequestJson
+        import('./widgets.js').then(module => {
+            module.updateRequestJson(node);
+        });
+    };
+    
+    input.addEventListener('input', (e) => {
+        onChange(e.target.value);
+    });
+    
+    container.appendChild(label);
+    container.appendChild(input);
+    
+    const widget = node.addDOMWidget(param.name, 'div', container, { serialize: false });
+    widget._wavespeed_dynamic = true;
+    widget._wavespeed_param = param.name;
+    
+    // Initialize parameter value
+    const existingValue = node.wavespeedState.parameterValues[param.name];
+    if (existingValue !== undefined) {
+        input.value = String(existingValue);
+    } else {
+        node.wavespeedState.parameterValues[param.name] = defaultValue;
+    }
+    
+    // Add restoreValue method for workflow restoration
+    widget.restoreValue = (value) => {
+        input.value = String(value);
+        onChange(value);
+    };
+    
+    widget.inputEl = input;
+    
+    return widget;
+}
+
+// Create TEXT/STRING DOM widget
+export function createTextDomWidget(node, param) {
+    const defaultValue = param.default || '';
+    
+    // Create container with horizontal layout (single row, input on right)
+    const container = document.createElement('div');
+    container.style.display = 'flex';
+    container.style.alignItems = 'center';
+    container.style.justifyContent = 'space-between';
+    container.style.gap = '8px';
+    container.style.width = '100%';
+    container.style.marginBottom = '4px';
+    
+    // Label (blue color matching media widgets)
+    const label = createLabel(param.displayName || param.name, param.required, param.description);
+    label.style.color = '#4a9eff';
+    label.style.fontSize = '12px';
+    label.style.fontWeight = '600';
+    label.style.minWidth = 'max-content';
+    label.style.flexShrink = '0';
+    
+    // Input element (fixed width on right side)
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = defaultValue;
+    input.placeholder = `Enter ${(param.displayName || param.name).toLowerCase()}...`;
+    input.style.minWidth = '150px';
+    input.style.maxWidth = '300px';
+    input.style.padding = '5px 10px';
+    input.style.backgroundColor = '#2a2a2a';
+    input.style.color = '#e0e0e0';
+    input.style.border = '1px solid #444';
+    input.style.borderRadius = '4px';
+    input.style.fontSize = '13px';
+    input.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    input.style.boxSizing = 'border-box';
+    
+    const onChange = (value) => {
+        node.wavespeedState.parameterValues[param.name] = value;
+        // Import and call updateRequestJson
+        import('./widgets.js').then(module => {
+            module.updateRequestJson(node);
+        });
+    };
+    
+    input.addEventListener('input', (e) => {
+        onChange(e.target.value);
+    });
+    
+    container.appendChild(label);
+    container.appendChild(input);
+    
+    const widget = node.addDOMWidget(param.name, 'div', container, { serialize: false });
+    widget._wavespeed_dynamic = true;
+    widget._wavespeed_param = param.name;
+    
+    // Initialize parameter value
+    const existingValue = node.wavespeedState.parameterValues[param.name];
+    if (existingValue !== undefined) {
+        input.value = existingValue;
+    } else {
+        node.wavespeedState.parameterValues[param.name] = defaultValue;
+    }
+    
+    // Add restoreValue method for workflow restoration
+    widget.restoreValue = (value) => {
+        input.value = value;
+        onChange(value);
+    };
+    
+    widget.inputEl = input;
+    
+    return widget;
+}
