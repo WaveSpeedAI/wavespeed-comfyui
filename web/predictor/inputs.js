@@ -492,7 +492,8 @@ export function hasDynamicConnections(node) {
 
     for (let i = 0; i < node.inputs.length; i++) {
         const input = node.inputs[i];
-        if (input.name !== 'Client' && input.link != null) {
+        if (input._wavespeed_fixed) continue;
+        if (input.link != null) {
             return true;
         }
     }
@@ -506,7 +507,8 @@ export function getConnectedInputNames(node) {
     const connected = [];
     for (let i = 0; i < node.inputs.length; i++) {
         const input = node.inputs[i];
-        if (input.name !== 'Client' && input.link != null) {
+        if (input._wavespeed_fixed) continue;
+        if (input.link != null) {
             connected.push(input.name);
         }
     }
@@ -524,7 +526,8 @@ export function disconnectAllDynamicInputs(node) {
 
     for (let i = node.inputs.length - 1; i >= 0; i--) {
         const input = node.inputs[i];
-        if (input.name !== 'Client' && input.link != null) {
+        if (input._wavespeed_fixed) continue;
+        if (input.link != null) {
             disconnectedNames.push(input.name);
             node.disconnectInput(i);
             disconnectedCount++;

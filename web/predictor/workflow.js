@@ -122,6 +122,19 @@ export function configureWorkflowSupport(node, app) {
         if (data.wavespeed) {
             this._wavespeed_savedData = data.wavespeed;
 
+            // Restore fixed input connections (e.g., client)
+            if (data.wavespeed.fixedInputs) {
+                for (const savedFixed of data.wavespeed.fixedInputs) {
+                    const input = this.inputs?.find(inp => inp.name === savedFixed.name);
+                    if (input) {
+                        input._wavespeed_fixed = true;
+                        if (savedFixed.link != null) {
+                            input.link = savedFixed.link;
+                        }
+                    }
+                }
+            }
+
             // Pre-initialize wavespeedState to prevent early serialize from saving empty data
             if (!this.wavespeedState) {
                 this.wavespeedState = {
@@ -282,6 +295,17 @@ export function configureWorkflowSupport(node, app) {
                     isExpandedArrayItem: inp._wavespeed_expanded_array_item,
                     parentArray: inp._wavespeed_parent_array,
                     arrayIndex: inp._wavespeed_array_index
+                }));
+        }
+
+        // Save fixed input connections (e.g., client)
+        if (this.inputs && this.inputs.length > 0) {
+            data.wavespeed.fixedInputs = this.inputs
+                .filter(inp => inp._wavespeed_fixed)
+                .map(inp => ({
+                    name: inp.name,
+                    type: inp.type,
+                    link: inp.link != null ? inp.link : null
                 }));
         }
 

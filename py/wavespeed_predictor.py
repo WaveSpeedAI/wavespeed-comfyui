@@ -382,9 +382,10 @@ def try_get_vhs_audio_bytes(value, param_name=None):
 
 def upload_bytes_to_wavespeed(file_bytes, filename, content_type):
     """Upload raw bytes to WaveSpeed media upload endpoint."""
-    api_key = get_api_key_from_config()
+    from .wavespeed_api_endpoints import get_effective_api_key
+    api_key = get_effective_api_key()
     if not api_key:
-        raise ValueError("No API key configured. Please configure your WaveSpeed API key.")
+        raise ValueError("No API key available. Please connect a WaveSpeed Client node.")
 
     upload_url = "https://api.wavespeed.ai/api/v3/media/upload/binary"
     files = {
@@ -820,12 +821,19 @@ class WaveSpeedAIPredictor:
         print("=" * 80)
 
         try:
-            # Get API key from config
-            api_key = get_api_key_from_config()
+            # Get API key: priority is connected client > env var / config fallback
+            client = kwargs.pop("client", None)
+            if client and hasattr(client, 'api_key') and client.api_key:
+                api_key = client.api_key
+            else:
+                # Fallback to env var
+                api_key = get_api_key_from_config()
+
             if not api_key:
                 raise ValueError(
-                    "No API key configured. Please go to Settings → WaveSpeed and enter your API key. "
-                    "You can get an API key at https://wavespeed.ai"
+                    "No API key provided. Please connect a WaveSpeed Client node "
+                    "or set the WAVESPEED_API_KEY environment variable. "
+                    "Get a key at https://wavespeed.ai"
                 )
             # model_id actually contains the api_path from frontend
             api_path = model_id

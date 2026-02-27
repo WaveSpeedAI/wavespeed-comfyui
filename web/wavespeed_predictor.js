@@ -35,7 +35,8 @@ app.registerExtension({
 
             // Only clear auto-created input slots in non-restore scenarios
             if (!isRestoring && this.inputs && this.inputs.length > 0) {
-                this.inputs = [];
+                // Preserve the fixed client input slot
+                this.inputs = this.inputs.filter(inp => inp._wavespeed_fixed);
             }
         };
 
@@ -79,7 +80,14 @@ app.registerExtension({
         // Only clear input slots in non-restore scenarios
         // In restore scenario, input slots are already created in configure and need to be kept to restore connections
         if (!isRestoring && node.inputs && node.inputs.length > 0) {
-            node.inputs = [];
+            // Preserve the fixed client input slot
+            node.inputs = node.inputs.filter(inp => inp._wavespeed_fixed);
+        }
+
+        // Ensure the fixed client input slot exists
+        if (!node.inputs?.some(inp => inp.name === 'client')) {
+            const clientInput = node.addInput('client', 'WAVESPEED_CLIENT');
+            clientInput._wavespeed_fixed = true;
         }
 
         // Override computeSize method
@@ -229,10 +237,12 @@ async function initializePredictorWidgets(node) {
 
             // In restore mode OR have dynamic inputs with saved data: keep them with link info
             if ((node._isRestoring || node._wavespeed_savedData) && dynamicInputs.length > 0) {
-                node.inputs = dynamicInputs;
+                // Keep fixed inputs + dynamic inputs
+                const fixedInputs = node.inputs.filter(inp => inp._wavespeed_fixed);
+                node.inputs = [...fixedInputs, ...dynamicInputs];
             } else {
-                // Fresh load or no dynamic inputs: clear all
-                node.inputs = [];
+                // Fresh load or no dynamic inputs: keep only fixed inputs
+                node.inputs = node.inputs.filter(inp => inp._wavespeed_fixed);
             }
         }
 

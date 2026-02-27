@@ -12,7 +12,7 @@ import asyncio
 import logging
 import time
 import io
-from .wavespeed_config import get_api_key_from_config, save_api_key, delete_api_key, has_api_key
+from .wavespeed_config import get_api_key_from_config
 
 # Global API key storage (set by WaveSpeedClient node)
 _global_api_key = None
@@ -500,10 +500,10 @@ async def upload_file_or_tensor(request):
         # Get effective API key (runtime or persistent config)
         api_key = get_effective_api_key()
         if not api_key:
-            logging.error("[WaveSpeed Upload] No API key available. Please configure your API key in Settings.")
+            logging.error("[WaveSpeed Upload] No API key available. Please connect a WaveSpeed Client node.")
             return web.json_response({
                 "success": False,
-                "error": "No API key configured. Please go to Settings → WaveSpeed and enter your API key."
+                "error": "No API key available. Please connect a WaveSpeed Client node or set WAVESPEED_API_KEY environment variable."
             })
 
         # Parse the multipart form data
@@ -631,10 +631,11 @@ async def upload_file_or_tensor(request):
             "error": str(e)
         })
 
-@PromptServer.instance.routes.post("/wavespeed/api/save_config")
-async def save_config_endpoint(request):
+@PromptServer.instance.routes.post("/wavespeed/api/set_key")
+async def set_key_endpoint(request):
     """
-    Save WaveSpeed configuration (API key)
+    Set the runtime API key (called from frontend Client node widget).
+    This allows the upload endpoint to work before the workflow is executed.
     """
     try:
         data = await request.json()
@@ -646,70 +647,14 @@ async def save_config_endpoint(request):
                 "error": "API key is required"
             })
 
-        # Save to config file
-        success = save_api_key(api_key)
-
-        if success:
-            logging.info("[WaveSpeed Config] API key saved via settings")
-            return web.json_response({
-                "success": True,
-                "message": "API key saved successfully"
-            })
-        else:
-            return web.json_response({
-                "success": False,
-                "error": "Failed to save API key"
-            })
-    except Exception as e:
-        logging.error(f"[WaveSpeed Config] Error saving config: {e}", exc_info=True)
-        return web.json_response({
-            "success": False,
-            "error": str(e)
-        })
-
-@PromptServer.instance.routes.get("/wavespeed/api/get_config")
-async def get_config_endpoint(request):
-    """
-    Get WaveSpeed configuration status (without exposing the actual key)
-    """
-    try:
-        has_key = has_api_key()
-
+        set_global_api_key(api_key)
+        logging.info("[WaveSpeed] Runtime API key set via /set_key endpoint")
         return web.json_response({
             "success": True,
-            "data": {
-                "has_api_key": has_key,
-                "api_key_configured": has_key
-            }
+            "message": "API key set successfully"
         })
     except Exception as e:
-        logging.error(f"[WaveSpeed Config] Error getting config: {e}", exc_info=True)
-        return web.json_response({
-            "success": False,
-            "error": str(e)
-        })
-
-@PromptServer.instance.routes.post("/wavespeed/api/delete_config")
-async def delete_config_endpoint(request):
-    """
-    Delete WaveSpeed API key from configuration
-    """
-    try:
-        success = delete_api_key()
-
-        if success:
-            logging.info("[WaveSpeed Config] API key deleted via settings")
-            return web.json_response({
-                "success": True,
-                "message": "API key deleted successfully"
-            })
-        else:
-            return web.json_response({
-                "success": False,
-                "error": "Failed to delete API key"
-            })
-    except Exception as e:
-        logging.error(f"[WaveSpeed Config] Error deleting config: {e}", exc_info=True)
+        logging.error(f"[WaveSpeed] Error setting key: {e}", exc_info=True)
         return web.json_response({
             "success": False,
             "error": str(e)
