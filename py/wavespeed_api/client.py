@@ -142,7 +142,7 @@ class WaveSpeedClient:
         if not request_id:
             raise Exception("No valid task ID provided")
         # Use 30s timeout for status checks - these should be quick
-        return self.get(f"/api/v2/predictions/{request_id}/result", timeout=30)
+        return self.get(f"/api/v3/predictions/{request_id}/result", timeout=30)
 
     def wait_for_task(self, request_id, polling_interval=5, timeout=None):
         """
@@ -222,7 +222,7 @@ class WaveSpeedClient:
         Returns:
             dict: API response containing the uploaded file information
         """
-        url = f"{self.BASE_URL}/api/v2/media/upload/binary"
+        url = f"{self.BASE_URL}/api/v3/media/upload/binary"
         buffered = io.BytesIO()
         image.save(buffered, format="PNG")
         buffered.seek(0)
@@ -249,7 +249,7 @@ class WaveSpeedClient:
         Args:
             video_path (str): Path to the video to be uploaded
         """
-        url = f"{self.BASE_URL}/api/v2/media/upload/binary"
+        url = f"{self.BASE_URL}/api/v3/media/upload/binary"
         with open(file_path, "rb") as file:
             file_name = ""
             if "video" in file_type:

@@ -494,7 +494,7 @@ def should_disable_parameter(prop):
 async def upload_file_or_tensor(request):
     """
     Upload file to WaveSpeed cloud server and return URL
-    Uses WaveSpeed's /api/v2/media/upload/binary endpoint
+    Uses WaveSpeed's /api/v3/media/upload/binary endpoint
     """
     try:
         # Get effective API key (runtime or persistent config)

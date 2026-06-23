@@ -1,7 +1,7 @@
 [project]
 name = "wavespeed-comfyui"
 description = "Universal AI generation plugin for ComfyUI - Access 600+ models across 25+ categories (text-to-image, image-to-video, text-to-audio, etc.) through WaveSpeed AI API. One node, all modalities."
-version = "2.0.0"
+version = "2.0.1"
 license = {file = "LICENSE"}
 readme = "README.md"
 requires-python = ">=3.8"
