@@ -15,7 +15,6 @@ import json
 import io
 import os
 import re
-import requests
 import tempfile
 import traceback
 import torch
@@ -26,6 +25,7 @@ from comfy.comfy_types.node_typing import IO as IO_TYPE
 from .wavespeed_api.client import WaveSpeedClient
 from .wavespeed_api.utils import imageurl2tensor
 from .wavespeed_config import get_api_key_from_config
+from .wavespeed_upload import upload_bytes
 
 def detect_tensor_type(tensor_data):
     """
@@ -386,31 +386,8 @@ def upload_bytes_to_wavespeed(file_bytes, filename, content_type):
     if not api_key:
         raise ValueError("No API key configured. Please configure your WaveSpeed API key.")
 
-    upload_url = "https://api.wavespeed.ai/api/v3/media/upload/binary"
-    files = {
-        'file': (filename, file_bytes, content_type)
-    }
-    headers = {
-        'Authorization': f'Bearer {api_key}'
-    }
-
-    print(f"[WaveSpeed] Uploading {filename} ({len(file_bytes)} bytes) to {upload_url}")
-
-    response = requests.post(upload_url, files=files, headers=headers, timeout=180)
-    if response.status_code != 200:
-        raise ValueError(f"Upload failed with status {response.status_code}: {response.text}")
-
-    result = response.json()
-    if isinstance(result, str):
-        return result
-    if isinstance(result, dict):
-        uploaded_url = (result.get('download_url') or
-                        result.get('url') or
-                        (result.get('data', {}).get('download_url') if isinstance(result.get('data'), dict) else None) or
-                        (result.get('data', {}).get('url') if isinstance(result.get('data'), dict) else None))
-        if uploaded_url:
-            return uploaded_url
-    raise ValueError(f"Upload API returned no URL: {result}")
+    print(f"[WaveSpeed] Uploading {filename} ({len(file_bytes)} bytes)")
+    return upload_bytes(file_bytes, filename, content_type, api_key)
 
 def should_force_image_upload(param_name):
     """Force image upload for image-like params (avoid video mp4 uploads)."""

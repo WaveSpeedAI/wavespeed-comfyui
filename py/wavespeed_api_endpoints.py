@@ -13,6 +13,7 @@ import logging
 import time
 import io
 from .wavespeed_config import get_api_key_from_config, save_api_key, delete_api_key, has_api_key
+from .wavespeed_upload import upload_bytes_async
 
 # Global API key storage (set by WaveSpeedClient node)
 _global_api_key = None
@@ -494,7 +495,7 @@ def should_disable_parameter(prop):
 async def upload_file_or_tensor(request):
     """
     Upload file to WaveSpeed cloud server and return URL
-    Uses WaveSpeed's /api/v3/media/upload/binary endpoint
+    Uses WaveSpeed's direct media upload flow
     """
     try:
         # Get effective API key (runtime or persistent config)
@@ -550,74 +551,19 @@ async def upload_file_or_tensor(request):
                         content_type = guessed_type
 
             # Upload to WaveSpeed cloud API (v3)
-            async with aiohttp.ClientSession() as session:
-                upload_url = "https://api.wavespeed.ai/api/v3/media/upload/binary"
-
-                # Create form data - match official example
-                form_data = aiohttp.FormData()
-                form_data.add_field('file',
-                                    file_data,
-                                    filename=filename or 'upload',
-                                    content_type=content_type)
-
-                headers = {
-                    'Authorization': f'Bearer {api_key}'
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=180)) as session:
+                download_url = await upload_bytes_async(
+                    session, file_data, filename or 'upload', content_type, api_key
+                )
+            logging.info(f"[WaveSpeed Upload] Success: {download_url}")
+            return web.json_response({
+                "success": True,
+                "data": {
+                    "url": download_url,
+                    "type": upload_type,
+                    "filename": filename
                 }
-
-                logging.info(f"[WaveSpeed Upload] Uploading {filename} ({len(file_data)} bytes) to {upload_url}")
-
-                async with session.post(
-                    upload_url,
-                    data=form_data,
-                    headers=headers,
-                    timeout=aiohttp.ClientTimeout(total=180)
-                ) as resp:
-                    response_text = await resp.text()
-                    logging.info(f"[WaveSpeed Upload] Response status: {resp.status}, body: {response_text[:200]}")
-
-                    if resp.status == 200:
-                        try:
-                            result = await resp.json()
-                            logging.info(f"[WaveSpeed Upload] Parsed response: {result}")
-
-                            # Response can be direct URL string or dict with various formats
-                            download_url = None
-                            if isinstance(result, str):
-                                download_url = result
-                            elif isinstance(result, dict):
-                                # Try different response formats
-                                download_url = (result.get('download_url') or
-                                              result.get('url') or
-                                              (result.get('data', {}).get('download_url') if isinstance(result.get('data'), dict) else None))
-
-                            if download_url:
-                                logging.info(f"[WaveSpeed Upload] Success: {download_url}")
-                                return web.json_response({
-                                    "success": True,
-                                    "data": {
-                                        "url": download_url,
-                                        "type": upload_type,
-                                        "filename": filename
-                                    }
-                                })
-                            else:
-                                logging.error(f"[WaveSpeed Upload] No URL in response: {result}")
-                                return web.json_response({
-                                    "success": False,
-                                    "error": f"No download URL in response"
-                                })
-                        except Exception as e:
-                            logging.error(f"[WaveSpeed Upload] Parse error: {e}, response: {response_text}")
-                            return web.json_response({
-                                "success": False,
-                                "error": f"Failed to parse response: {str(e)}"
-                            })
-                    else:
-                        logging.error(f"[WaveSpeed Upload] HTTP {resp.status}: {response_text}")
-                        return web.json_response({
-                            "success": False,
-                            "error": f"Upload failed: HTTP {resp.status}"
-                        })
+            })
 
         return web.json_response({
             "success": False,

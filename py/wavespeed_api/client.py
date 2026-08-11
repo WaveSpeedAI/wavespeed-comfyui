@@ -6,6 +6,7 @@ from .utils import BaseRequest
 import PIL.Image
 import io
 import base64
+from ..wavespeed_upload import upload_bytes
 
 
 class WaveSpeedClient:
@@ -222,24 +223,9 @@ class WaveSpeedClient:
         Returns:
             dict: API response containing the uploaded file information
         """
-        url = f"{self.BASE_URL}/api/v3/media/upload/binary"
         buffered = io.BytesIO()
         image.save(buffered, format="PNG")
-        buffered.seek(0)
-        files = {'file': ('image.png', buffered, 'image/png')}
-        # Set timeout for file uploads: (connect_timeout, read_timeout)
-        timeout_tuple = (15, 180)  # 15s connect, 180s read for uploads
-        response = self.session.post(url, headers={'Authorization': f'Bearer {self.api_key}'}, files=files, timeout=timeout_tuple)
-
-        if response.status_code != 200:
-            raise Exception(f"Upload failed: {response.status_code}")
-
-        response_data = response.json()
-        if isinstance(response_data, dict) and 'code' in response_data:
-            if response_data['code'] != 200:
-                raise Exception(f"API Error: {response_data.get('message', 'Unknown error')}")
-            return response_data.get('data', {})["download_url"]
-        raise Exception("No download URL in response")
+        return upload_bytes(buffered.getvalue(), "image.png", "image/png", self.api_key, self.BASE_URL, self.session)
 
 
     def upload_file_with_type(self, file_path: str, file_type: str):
@@ -249,28 +235,14 @@ class WaveSpeedClient:
         Args:
             video_path (str): Path to the video to be uploaded
         """
-        url = f"{self.BASE_URL}/api/v3/media/upload/binary"
+        if "video" in file_type:
+            file_name = "video.mp4"
+        elif "image" in file_type:
+            file_name = "image.png"
+        elif "audio" in file_type:
+            file_name = "audio.mp3"
+        else:
+            raise Exception("Invalid file type")
         with open(file_path, "rb") as file:
-            file_name = ""
-            if "video" in file_type:
-               file_name = "video.mp4"
-            elif "image" in file_type:
-                file_name = "image.png"
-            elif "audio" in file_type:
-                file_name = "audio.mp3"
-            else:
-                raise Exception("Invalid file type")
-            files = {'file': (file_name, file, file_type)}
-            # Set timeout for file uploads: (connect_timeout, read_timeout)
-            timeout_tuple = (15, 180)  # 15s connect, 180s read for uploads
-            response = self.session.post(url, headers={'Authorization': f'Bearer {self.api_key}'}, files=files, timeout=timeout_tuple)
-
-        if response.status_code != 200:
-            raise Exception(f"Upload failed: {response.status_code}")
-
-        response_data = response.json()
-        if isinstance(response_data, dict) and 'code' in response_data:
-            if response_data['code'] != 200:
-                raise Exception(f"API Error: {response_data.get('message', 'Unknown error')}")
-            return response_data.get('data', {})["download_url"]
-        raise Exception("No download URL in response")
+            file_bytes = file.read()
+        return upload_bytes(file_bytes, file_name, file_type, self.api_key, self.BASE_URL, self.session)
