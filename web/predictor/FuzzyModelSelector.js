@@ -56,7 +56,7 @@ export function createLoadingProgress() {
 
     // Tip text
     const tipText = document.createElement('div');
-    tipText.textContent = 'First load takes 2-4 minutes depending on your network. Subsequent loads are instant.';
+    tipText.textContent = 'After configuring an API key, the first load usually takes 5-10 seconds. Subsequent loads use the cache.';
     tipText.style.fontSize = '11px';
     tipText.style.color = '#888';
     tipText.style.marginTop = '10px';

@@ -14,6 +14,14 @@ import time
 import io
 from .wavespeed_config import get_api_key_from_config, save_api_key, delete_api_key, has_api_key
 from .wavespeed_upload import upload_bytes_async
+from .wavespeed_catalog import (
+    MODEL_CATALOG_URL,
+    ModelCatalogError,
+    categories_from_catalog,
+    model_detail_from_catalog,
+    models_from_catalog,
+    parse_catalog_response,
+)
 
 # Global API key storage (set by WaveSpeedClient node)
 _global_api_key = None
@@ -21,6 +29,8 @@ _global_api_key = None
 def set_global_api_key(api_key):
     """Set the global API key for uploads"""
     global _global_api_key
+    if _global_api_key != api_key:
+        clear_model_cache()
     _global_api_key = api_key
     logging.info("[WaveSpeed] Global API key set")
 
@@ -50,6 +60,16 @@ _cache = {
     'cache_time': {},
     'ttl': 5 * 60  # 5 minutes
 }
+
+def clear_model_cache():
+    """Invalidate every value derived from the authenticated model catalog."""
+    _cache['categories'] = None
+    _cache['models'].clear()
+    _cache['model_details'].clear()
+    _cache['cache_time'].clear()
+    for key in list(_cache):
+        if key not in {'categories', 'models', 'model_details', 'cache_time', 'ttl'}:
+            _cache.pop(key, None)
 
 def is_cache_valid(key):
     """Check if the cache is valid"""
@@ -103,110 +123,67 @@ def schedule_cache_refresh(key, fetcher, *args, **kwargs):
     loop = asyncio.get_event_loop()
     loop.create_task(refresh_cache_async(key, fetcher, *args, **kwargs))
 
+async def fetch_model_catalog_from_api():
+    """Fetch the official catalog with the API key already configured by the user."""
+    api_key = get_effective_api_key()
+    if not api_key:
+        raise ModelCatalogError("Configure a WaveSpeed API key before loading models")
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Accept": "application/json",
+        "User-Agent": "ComfyUI-WaveSpeedAI-API/1.0.0",
+    }
+    timeout = aiohttp.ClientTimeout(total=60, connect=10)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        async with session.get(MODEL_CATALOG_URL, headers=headers) as resp:
+            if resp.status in (401, 403):
+                raise ModelCatalogError("The configured WaveSpeed API key cannot read the model catalog")
+            if resp.status != 200:
+                raise ModelCatalogError(f"Model catalog API returned HTTP {resp.status}")
+            try:
+                payload = await resp.json()
+            except Exception as error:
+                raise ModelCatalogError("Model catalog API returned invalid JSON") from error
+    if api_key != get_effective_api_key():
+        raise ModelCatalogError("The WaveSpeed API key changed while loading models; please retry")
+    return parse_catalog_response(payload)
+
+
+async def get_model_catalog():
+    """Return one shared catalog cache for categories, lists, and details."""
+    cache_key = "model_catalog"
+    cached = get_cache(cache_key, allow_stale=True)
+    age = cache_age_seconds(cache_key)
+    if cached is not None and age is not None and age < _cache["ttl"]:
+        return cached
+    if cached is not None:
+        schedule_cache_refresh(cache_key, fetch_model_catalog_from_api)
+        return cached
+
+    catalog = await fetch_model_catalog_from_api()
+    set_cache(cache_key, catalog)
+    return catalog
+
+
 async def fetch_model_categories_from_api():
-    """Fetch categories from WaveSpeed API"""
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get("https://wavespeed.ai/center/default/api/v1/model_product/type_statistics") as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    if data.get("code") == 200 and data.get("data"):
-                        categories = []
-                        for item in data["data"]:
-                            if item.get("count", 0) > 0:
-                                categories.append({
-                                    "name": format_category_name(item["type"]),
-                                    "value": item["type"],
-                                    "count": item["count"]
-                                })
-                        return categories
-    except Exception as e:
-        logging.error(f"Error fetching categories: {e}", exc_info=True)
-    return None
+    catalog = await get_model_catalog()
+    return categories_from_catalog(catalog, format_category_name)
+
 
 async def fetch_models_from_api(category):
-    """Fetch models from WaveSpeed API for a category"""
-    try:
-        async with aiohttp.ClientSession() as session:
-            url = f"https://wavespeed.ai/center/default/api/v1/model_product/search?page=1&page_size=100&types={category}"
-            async with session.get(url) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    if data.get("code") == 200 and data.get("data", {}).get("items"):
-                        models = []
-                        for model in data["data"]["items"]:
-                            models.append({
-                                "name": model.get("model_name", ""),
-                                "value": model.get("model_uuid", ""),
-                            })
-                        return models
-    except Exception as e:
-        logging.error(f"Error fetching models for category {category}: {e}", exc_info=True)
-    return None
+    catalog = await get_model_catalog()
+    return models_from_catalog(catalog, category)
 
 class ModelDetailError(Exception):
     """Expected errors while fetching model detail"""
 
 async def fetch_model_detail_from_api(model_id):
-    """Fetch model detail from WaveSpeed API and normalize"""
-    async with aiohttp.ClientSession() as session:
-        url = f"https://wavespeed.ai/center/default/api/v1/model_product/detail/{model_id}"
-        headers = {
-            'User-Agent': 'ComfyUI-WaveSpeedAI-API/1.0.0',
-            'Accept': '*/*',
-            'Host': 'wavespeed.ai',
-            'Connection': 'keep-alive',
-        }
-
-        async with session.get(url, headers=headers, timeout=10) as resp:
-            if resp.status == 404:
-                raise ModelDetailError(f"Model '{model_id}' not found")
-
-            if resp.status != 200:
-                raise ModelDetailError(f"API request failed with status {resp.status}")
-
-            try:
-                data = await resp.json()
-            except Exception as json_error:
-                text_content = await resp.text()
-                logging.error(f"JSON parse error for model {model_id}: {json_error}")
-                logging.error(f"Response content: {text_content[:500]}")
-                raise ModelDetailError(f"Invalid JSON response from API: {str(json_error)}")
-
-            if data.get("code") != 200:
-                message = data.get("message", "Unknown API error")
-                raise ModelDetailError(f"API returned error code {data.get('code')}: {message}")
-
-            if not data.get("data"):
-                raise ModelDetailError(f"No model data found for '{model_id}'")
-
-            model_detail = convert_api_model_to_model_info(data["data"])
-            
-            logging.info(f"--- Full Model Detail (raw) ---\n{json.dumps(model_detail, indent=2)}\n---------------------------------")
-            
-            if (model_detail and
-                model_detail.get("api_schema", {}).get("api_schemas") and
-                len(model_detail["api_schema"]["api_schemas"]) > 0 and
-                model_detail["api_schema"]["api_schemas"][0].get("request_schema")):
-
-                api_schema_item = model_detail["api_schema"]["api_schemas"][0]
-                request_schema = api_schema_item["request_schema"]
-                api_path = api_schema_item.get("api_path", f"/api/v3/{model_detail['model_uuid']}")
-
-                simplified_model_detail = {
-                    "id": model_detail["id"],
-                    "name": model_detail["name"],
-                    "description": model_detail["description"],
-                    "category": model_detail["category"],
-                    "model_uuid": model_detail["model_uuid"],
-                    "api_path": api_path,
-                    "input_schema": request_schema
-                }
-                
-                logging.info(f"simplified_model_detail: {json.dumps(simplified_model_detail, indent=2)}")
-                return simplified_model_detail
-
-            raise ModelDetailError(f"No valid request schema found for model '{model_id}'")
+    """Resolve model detail from the shared official catalog."""
+    try:
+        return model_detail_from_catalog(await get_model_catalog(), model_id)
+    except ModelCatalogError as error:
+        raise ModelDetailError(str(error)) from error
 
 @PromptServer.instance.routes.get("/wavespeed/api/categories")
 async def get_model_categories(_):
@@ -231,21 +208,15 @@ async def get_model_categories(_):
 
     except Exception as e:
         logging.error(f"Error fetching categories: {e}", exc_info=True)
+        return web.json_response({"success": False, "error": str(e)})
 
-    # Return default categories
-    default_categories = [
-        {"name": "Text to Image", "value": "text-to-image", "count": 0},
-        {"name": "Image to Video", "value": "image-to-video", "count": 0},
-        {"name": "Text to Video", "value": "text-to-video", "count": 0}
-    ]
-    return web.json_response({"success": True, "data": default_categories})
+    return web.json_response({"success": False, "error": "Model catalog returned no categories"})
 
 @PromptServer.instance.routes.get("/wavespeed/api/models/{category}")
 async def get_models_by_category(request):
     """Get the list of models by category"""
+    category = request.match_info.get('category', '')
     try:
-        category = request.match_info['category']
-
         # Check cache
         cache_key = f"models_{category}"
         cached = get_cache(cache_key, allow_stale=True)
@@ -265,8 +236,9 @@ async def get_models_by_category(request):
 
     except Exception as e:
         logging.error(f"Error fetching models for category {category}: {e}", exc_info=True)
+        return web.json_response({"success": False, "error": str(e)})
 
-    return web.json_response({"success": False, "error": "Failed to fetch models"})
+    return web.json_response({"success": False, "error": f"Model catalog returned no models for {category}"})
 
 @PromptServer.instance.routes.get("/wavespeed/api/model")
 async def get_model_detail(request):
@@ -596,6 +568,7 @@ async def save_config_endpoint(request):
         success = save_api_key(api_key)
 
         if success:
+            clear_model_cache()
             logging.info("[WaveSpeed Config] API key saved via settings")
             return web.json_response({
                 "success": True,
@@ -644,6 +617,7 @@ async def delete_config_endpoint(request):
         success = delete_api_key()
 
         if success:
+            clear_model_cache()
             logging.info("[WaveSpeed Config] API key deleted via settings")
             return web.json_response({
                 "success": True,

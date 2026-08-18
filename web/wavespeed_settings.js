@@ -6,6 +6,7 @@
 
 import { app } from "../../../scripts/app.js";
 import { api } from "../../../scripts/api.js";
+import { clearModelCache } from "./predictor/api.js";
 
 // Register settings extension
 app.registerExtension({
@@ -36,6 +37,7 @@ app.registerExtension({
 
                         const result = await response.json();
                         if (result.success) {
+                            clearModelCache();
                             console.log("[WaveSpeed Settings] API key deleted");
                         } else {
                             console.error("[WaveSpeed Settings] Failed to delete API key:", result.error);
@@ -56,6 +58,7 @@ app.registerExtension({
                     const result = await response.json();
 
                     if (result.success) {
+                        clearModelCache();
                         console.log("[WaveSpeed Settings] API key saved successfully");
                     } else {
                         console.error("[WaveSpeed Settings] Failed to save API key:", result.error);

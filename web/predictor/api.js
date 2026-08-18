@@ -3,116 +3,25 @@
  */
 
 import { api } from "../../../../scripts/api.js";
+import { createModelCache } from "./cache.js";
 
 // Global cache management
-const GLOBAL_CACHE = {
-    cacheExpiry: 5 * 60 * 1000,
-    stats: { hits: 0, misses: 0, lastUpdate: Date.now() },
-
-    get categories() {
-        try {
-            const cached = localStorage.getItem('wavespeed_categories');
-            if (cached) {
-                const data = JSON.parse(cached);
-                this.stats.hits++;
-                return data.value;
-            }
-        } catch (e) {}
-        this.stats.misses++;
-        return null;
-    },
-
-    set categories(value) {
-        try {
-            localStorage.setItem('wavespeed_categories', JSON.stringify({
-                value: value,
-                timestamp: Date.now()
-            }));
-            this.stats.lastUpdate = Date.now();
-        } catch (e) {}
-    },
-
-    getModelsByCategory(category) {
-        try {
-            const cached = localStorage.getItem(`wavespeed_models_${category}`);
-            if (cached) {
-                const data = JSON.parse(cached);
-                this.stats.hits++;
-                return data.value;
-            }
-        } catch (e) {}
-        this.stats.misses++;
-        return null;
-    },
-
-    setModelsByCategory(category, value) {
-        try {
-            localStorage.setItem(`wavespeed_models_${category}`, JSON.stringify({
-                value: value,
-                timestamp: Date.now()
-            }));
-            this.stats.lastUpdate = Date.now();
-        } catch (e) {}
-    },
-
-    getModelDetail(modelId) {
-        try {
-            const cached = localStorage.getItem(`wavespeed_model_${modelId}`);
-            if (cached) {
-                const data = JSON.parse(cached);
-                this.stats.hits++;
-                return data.value;
-            }
-        } catch (e) {}
-        this.stats.misses++;
-        return null;
-    },
-
-    setModelDetail(modelId, value) {
-        try {
-            localStorage.setItem(`wavespeed_model_${modelId}`, JSON.stringify({
-                value: value,
-                timestamp: Date.now()
-            }));
-            this.stats.lastUpdate = Date.now();
-        } catch (e) {}
-    },
-
-    clearAll() {
-        try {
-            const keys = Object.keys(localStorage);
-            for (const key of keys) {
-                if (key.startsWith('wavespeed_')) {
-                    localStorage.removeItem(key);
-                }
-            }
-            this.stats = { hits: 0, misses: 0, lastUpdate: Date.now() };
-        } catch (e) {
-            console.error("[WaveSpeed] Failed to clear cache:", e);
-        }
-    },
-
-    getCacheStats() {
-        const total = this.stats.hits + this.stats.misses;
-        const hitRate = total > 0 ? (this.stats.hits / total * 100).toFixed(1) : 0;
-        return {
-            hits: this.stats.hits,
-            misses: this.stats.misses,
-            total: total,
-            hitRate: `${hitRate}%`,
-            lastUpdate: new Date(this.stats.lastUpdate).toLocaleString()
-        };
-    }
-};
+const GLOBAL_CACHE = createModelCache(localStorage);
 
 // API call functions
 export async function fetchWaveSpeedAPI(endpoint) {
     try {
         const response = await api.fetchApi(endpoint);
+        let data = null;
+        try {
+            data = await response.json();
+        } catch (error) {}
         if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            throw new Error(data?.error || `HTTP ${response.status}: ${response.statusText}`);
         }
-        const data = await response.json();
+        if (data === null) {
+            throw new Error("WaveSpeed API returned invalid JSON");
+        }
         return data;
     } catch (error) {
         console.error(`[WaveSpeed] Error fetching ${endpoint}:`, error);
@@ -127,16 +36,14 @@ export async function getModelCategories() {
         const result = await fetchWaveSpeedAPI("/wavespeed/api/categories");
         const elapsed = performance.now() - startTime;
         console.log(`[WaveSpeed API] Categories fetched in ${elapsed.toFixed(0)}ms`);
-        if (result && result.success && result.data) {
+        if (result?.success && Array.isArray(result.data) && result.data.length > 0) {
             return result.data;
-        } else {
-            console.error("[WaveSpeed] Invalid categories response:", result);
-            return [];
         }
+        throw new Error(result?.error || "Model catalog returned no categories");
     } catch (error) {
         const elapsed = performance.now() - startTime;
         console.error(`[WaveSpeed] Failed to get categories after ${elapsed.toFixed(0)}ms:`, error);
-        return [];
+        throw error;
     }
 }
 
@@ -147,16 +54,14 @@ export async function getModelsByCategory(category) {
         const result = await fetchWaveSpeedAPI(`/wavespeed/api/models/${category}`);
         const elapsed = performance.now() - startTime;
         console.log(`[WaveSpeed API] Models for ${category} fetched in ${elapsed.toFixed(0)}ms`);
-        if (result && result.success && result.data) {
+        if (result?.success && Array.isArray(result.data) && result.data.length > 0) {
             return result.data;
-        } else {
-            console.error("[WaveSpeed] Invalid models response:", result);
-            return [];
         }
+        throw new Error(result?.error || `Model catalog returned no models for ${category}`);
     } catch (error) {
         const elapsed = performance.now() - startTime;
         console.error(`[WaveSpeed] Failed to get models for ${category} after ${elapsed.toFixed(0)}ms:`, error);
-        return [];
+        throw error;
     }
 }
 
@@ -330,7 +235,7 @@ export async function preloadAllModels(onProgress) {
         } catch (error) {
             console.error("[Preload] Failed to preload models:", error);
             SHARED_PRELOAD_PROMISE = null;
-            return null;
+            throw error;
         }
     })();
 
@@ -339,9 +244,13 @@ export async function preloadAllModels(onProgress) {
 }
 
 export async function refreshAllModels(onProgress) {
+    clearModelCache();
+    return await preloadAllModels(onProgress);
+}
+
+export function clearModelCache() {
     GLOBAL_CACHE.clearAll();
     SHARED_PRELOAD_PROMISE = null;
-    return await preloadAllModels(onProgress);
 }
 
 export { GLOBAL_CACHE };

@@ -36,7 +36,7 @@ NODE_CLASS_MAPPINGS = {}
 NODE_DISPLAY_NAME_MAPPINGS = {}
 
 # Files that are utility modules (no ComfyUI nodes), skip them during node discovery
-_SKIP_NODE_FILES = {"wavespeed_api_endpoints", "wavespeed_api_utils", "wavespeed_config"}
+_SKIP_NODE_FILES = {"wavespeed_api_endpoints", "wavespeed_catalog", "wavespeed_config"}
 
 def get_ext_dir(subpath=None, mkdir=False):
     dir = os.path.dirname(__file__)

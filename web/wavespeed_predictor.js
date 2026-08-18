@@ -274,7 +274,7 @@ async function createBasicUI(node, apiModule, utilsModule) {
         try {
             const startTime = Date.now();
             let categoriesCount = 0;
-            const totalEstimatedTime = 150000; // 150 seconds estimated
+            const totalEstimatedTime = 10000; // Catalog loading usually completes within 5-10 seconds
 
             const preloadData = await apiModule.preloadAllModels((progress) => {
                 if (progress.step === 'categories') {
@@ -300,7 +300,7 @@ async function createBasicUI(node, apiModule, utilsModule) {
             }
         } catch (error) {
             console.error('[WaveSpeed Predictor] Preload failed:', error);
-            loadingProgress.container.innerHTML = '<div style="color:#ff4444;padding:10px;">❌ Failed to load models</div>';
+            app.ui.dialog.show(`Failed to load WaveSpeed models: ${error.message}`);
         }
 
         // Remove loading indicator - compatible with both Canvas and Vue rendering modes
