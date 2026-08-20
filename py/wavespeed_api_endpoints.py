@@ -14,6 +14,7 @@ import time
 import io
 from .wavespeed_config import get_api_key_from_config, save_api_key, delete_api_key, has_api_key
 from .wavespeed_upload import upload_bytes_async
+from .wavespeed_client_info import get_client_headers
 from .wavespeed_catalog import (
     MODEL_CATALOG_URL,
     ModelCatalogError,
@@ -133,6 +134,7 @@ async def fetch_model_catalog_from_api():
         "Authorization": f"Bearer {api_key}",
         "Accept": "application/json",
         "User-Agent": "ComfyUI-WaveSpeedAI-API/1.0.0",
+        **get_client_headers(),
     }
     timeout = aiohttp.ClientTimeout(total=60, connect=10)
     async with aiohttp.ClientSession(timeout=timeout) as session:

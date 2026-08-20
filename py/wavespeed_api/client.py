@@ -7,6 +7,7 @@ import PIL.Image
 import io
 import base64
 from ..wavespeed_upload import upload_bytes
+from ..wavespeed_client_info import get_client_headers
 
 
 class WaveSpeedClient:
@@ -28,7 +29,7 @@ class WaveSpeedClient:
         self.api_key = api_key
         self.once_timeout = 1800  # Default timeout is 1800 seconds (30 minutes)
 
-        self.headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        self.headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json", **get_client_headers()}
 
         # Create session with connection pooling and retry strategy
         self.session = requests.Session()

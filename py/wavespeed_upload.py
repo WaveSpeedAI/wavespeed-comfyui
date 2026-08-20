@@ -2,6 +2,11 @@
 
 import requests
 
+try:
+    from .wavespeed_client_info import get_client_headers
+except ImportError:
+    from wavespeed_client_info import get_client_headers
+
 
 def _ticket_payload(file_bytes, filename, content_type=None):
     payload = {"filename": filename, "size": len(file_bytes)}
@@ -27,7 +32,7 @@ def upload_bytes(file_bytes, filename, content_type, api_key, base_url="https://
     ticket = http.post(
         f"{base_url.rstrip('/')}/api/v3/media/uploads",
         json=_ticket_payload(file_bytes, filename, content_type),
-        headers={"Authorization": f"Bearer {api_key}"},
+        headers={"Authorization": f"Bearer {api_key}", **get_client_headers()},
         timeout=(15, 180),
     )
     if ticket.status_code != 200:
@@ -48,7 +53,7 @@ def upload_bytes(file_bytes, filename, content_type, api_key, base_url="https://
 
 async def upload_bytes_async(session, file_bytes, filename, content_type, api_key, base_url="https://api.wavespeed.ai"):
     """Async variant used by the ComfyUI HTTP endpoint."""
-    headers = {"Authorization": f"Bearer {api_key}"}
+    headers = {"Authorization": f"Bearer {api_key}", **get_client_headers()}
     async with session.post(
         f"{base_url.rstrip('/')}/api/v3/media/uploads",
         json=_ticket_payload(file_bytes, filename, content_type),
