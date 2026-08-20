@@ -1,0 +1,92 @@
+{
+  "1": {
+    "class_type": "ETN_KritaCanvas",
+    "inputs": {}
+  },
+  "2": {
+    "class_type": "ETN_Parameter",
+    "inputs": {
+      "name": "1. Prompt",
+      "type": "prompt (positive)",
+      "default": "a cinematic cyberpunk city at night, neon lights reflecting on wet streets"
+    }
+  },
+  "3": {
+    "class_type": "ETN_Parameter",
+    "inputs": {
+      "name": "2. Aspect ratio",
+      "type": "text",
+      "default": "1:1"
+    }
+  },
+  "4": {
+    "class_type": "ETN_Parameter",
+    "inputs": {
+      "name": "3. Resolution",
+      "type": "text",
+      "default": "2k"
+    }
+  },
+  "5": {
+    "class_type": "WaveSpeedAIPredictor",
+    "inputs": {
+      "model_id": "/api/v3/google/nano-banana-pro/text-to-image",
+      "request_json": "{\"prompt\": \"\", \"aspect_ratio\": \"1:1\", \"resolution\": \"2k\", \"output_format\": \"png\"}",
+      "param_map": "{\"prompt\": {\"type\": \"string\"}, \"aspect_ratio\": {\"type\": \"string\", \"options\": [\"1:1\", \"3:2\", \"2:3\", \"3:4\", \"4:3\", \"4:5\", \"5:4\", \"9:16\", \"16:9\", \"21:9\"]}, \"resolution\": {\"type\": \"string\", \"options\": [\"1k\", \"2k\", \"4k\"]}, \"output_format\": {\"type\": \"string\", \"options\": [\"png\", \"jpeg\"]}}",
+      "prompt": [
+        "2",
+        0
+      ],
+      "aspect_ratio": [
+        "3",
+        0
+      ],
+      "resolution": [
+        "4",
+        0
+      ]
+    }
+  },
+  "6": {
+    "class_type": "WaveSpeedAI Preview",
+    "inputs": {
+      "input_url": [
+        "5",
+        0
+      ]
+    }
+  },
+  "7": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "6",
+        0
+      ],
+      "upscale_method": "lanczos",
+      "width": [
+        "1",
+        1
+      ],
+      "height": [
+        "1",
+        2
+      ],
+      "crop": "disabled"
+    }
+  },
+  "8": {
+    "class_type": "ETN_KritaOutput",
+    "inputs": {
+      "images": [
+        "7",
+        0
+      ],
+      "x": 0,
+      "y": 0,
+      "name": "WaveSpeed",
+      "batch_mode": "default",
+      "resize_canvas": false
+    }
+  }
+}

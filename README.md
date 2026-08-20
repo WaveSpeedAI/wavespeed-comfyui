@@ -453,6 +453,12 @@ The plugin intelligently detects output types and returns the appropriate format
 - **3D Models**: URL with .glb/.obj format (for 3D viewer)
 - **Text**: Plain text output
 
+### Using WaveSpeed models from Krita
+
+The nodes work unmodified with the [Krita AI Diffusion](https://github.com/Acly/krita-ai-diffusion)
+plugin through its custom graph workspace. See [docs/krita.md](docs/krita.md) for setup, and
+[`examples/krita/`](examples/krita) for two ready-made workflows (image edit, text to image).
+
 ### Workflow Save/Restore
 
 **Automatic Workflow Persistence:**
