@@ -620,3 +620,8 @@ Our support team is ready to assist you with any questions or issues.
 [⭐ Star us on GitHub](https://github.com/WaveSpeedAI/wavespeed-comfyui) | [🌐 Visit WaveSpeed.ai](https://wavespeed.ai)
 
 </div>
+
+---
+
+**[WaveSpeed AI](https://wavespeed.ai/)** — hosted inference for image, video, audio and 3D models.
+Try it in the browser: **[Image generator](https://wavespeed.ai/image-generator)** · **[Video generator](https://wavespeed.ai/video-generator)**
