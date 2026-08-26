@@ -174,9 +174,9 @@ class WaveSpeedClient:
 
             if status == "completed":
                 return task_status
-            elif status == "failed":
-                error_message = task_status.get("error", "Task failed")
-                raise Exception(f"Task failed: {error_message}")
+            elif status in ("failed", "cancelled", "timeout", "deleted"):
+                error_message = task_status.get("error") or f"Task ended with status: {status}"
+                raise Exception(error_message)
 
             time.sleep(polling_interval)
 
