@@ -42,9 +42,9 @@
       },
       "widgets_values": [
         "",
-        "/api/v3/alibaba/wan-2.6/image-to-video",
-        "{\"audio\":\"\",\"prompt\":\"Subtle cinematic motion, rain falling,\\nneon lights flickering slightly,\\ngentle camera movement, realistic atmosphere,\\nkeep character identity consistent\",\"negative_prompt\":\"illustration, painting style, anime, low detail\",\"resolution\":\"1080p\",\"duration\":5,\"shot_type\":\"single\",\"enable_prompt_expansion\":false,\"seed\":0}",
-        "{\"image\":{\"type\":\"string\"},\"audio\":{\"type\":\"string\"},\"prompt\":{\"type\":\"string\"},\"negative_prompt\":{\"type\":\"string\"},\"resolution\":{\"type\":\"string\",\"options\":[\"720p\",\"1080p\"]},\"duration\":{\"type\":\"string\",\"options\":[5,10,15]},\"shot_type\":{\"type\":\"string\",\"options\":[\"single\",\"multi\"]},\"enable_prompt_expansion\":{\"type\":\"boolean\"},\"seed\":{\"type\":\"number\"}}",
+        "/api/v3/wavespeed-ai/minimax-h3/image-to-video",
+        "{\"prompt\": \"Subtle cinematic motion, rain falling,\\nneon lights flickering slightly,\\ngentle camera movement, realistic atmosphere,\\nkeep character identity consistent\", \"resolution\": \"768p\", \"duration\": 5, \"seed\": -1}",
+        "{\"image\": {\"type\": \"string\"}, \"last_image\": {\"type\": \"string\"}, \"prompt\": {\"type\": \"string\"}, \"resolution\": {\"type\": \"string\", \"options\": [\"480p\", \"540p\", \"768p\", \"1080p\"]}, \"duration\": {\"type\": \"number\", \"options\": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]}, \"seed\": {\"type\": \"number\"}}",
         "",
         "",
         "",

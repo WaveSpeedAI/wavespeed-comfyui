@@ -33,9 +33,9 @@
       },
       "widgets_values": [
         "",
-        "/api/v3/alibaba/wan-2.6/text-to-video",
-        "{\"prompt\":\"A cinematic cyberpunk city at night in the rain.\\nA mysterious messenger walks slowly through neon-lit streets.\\nCamera slowly pushes forward, rain falling in slow motion,\\nneon reflections on wet ground, dramatic cinematic lighting,\\nrealistic motion, movie-quality visuals\",\"negative_prompt\":\"illustration, painting style, anime, low detail\",\"audio\":\"\",\"size\":\"1280*720\",\"duration\":5,\"shot_type\":\"single\",\"enable_prompt_expansion\":false,\"seed\":0}",
-        "{\"prompt\":{\"type\":\"string\"},\"negative_prompt\":{\"type\":\"string\"},\"audio\":{\"type\":\"string\"},\"size\":{\"type\":\"string\",\"options\":[\"1280*720\",\"720*1280\",\"1920*1080\",\"1080*1920\"]},\"duration\":{\"type\":\"string\",\"options\":[5,10,15]},\"shot_type\":{\"type\":\"string\",\"options\":[\"single\",\"multi\"]},\"enable_prompt_expansion\":{\"type\":\"boolean\"},\"seed\":{\"type\":\"number\"}}",
+        "/api/v3/wavespeed-ai/minimax-h3/text-to-video",
+        "{\"prompt\": \"A cinematic cyberpunk city at night in the rain.\\nA mysterious messenger walks slowly through neon-lit streets.\\nCamera slowly pushes forward, rain falling in slow motion,\\nneon reflections on wet ground, dramatic cinematic lighting,\\nrealistic motion, movie-quality visuals\", \"aspect_ratio\": \"16:9\", \"resolution\": \"768p\", \"duration\": 5, \"seed\": -1}",
+        "{\"prompt\": {\"type\": \"string\"}, \"aspect_ratio\": {\"type\": \"string\", \"options\": [\"16:9\", \"9:16\", \"1:1\", \"4:3\", \"3:4\", \"21:9\", \"9:21\"]}, \"resolution\": {\"type\": \"string\", \"options\": [\"480p\", \"540p\", \"768p\", \"1080p\"]}, \"duration\": {\"type\": \"number\", \"options\": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]}, \"seed\": {\"type\": \"number\"}}",
         "",
         "",
         "",
