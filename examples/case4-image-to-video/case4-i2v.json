@@ -200,7 +200,7 @@
         "media_data": [
           {
             "type": "video",
-            "url": "https://d1q70pf5vjeyhc.cloudfront.net/predictions/6e9f4f4612ba4360bba92bd758ea17a3/1.mp4"
+            "url": "https://raw.githubusercontent.com/WaveSpeedAI/wavespeed-comfyui/afdf9ff3a73ef972c7d0f82ed5f8d55258cff30d/examples/case4-image-to-video/case4.mp4"
           }
         ]
       }

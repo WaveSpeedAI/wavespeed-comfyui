@@ -147,7 +147,7 @@
         "media_data": [
           {
             "type": "video",
-            "url": "https://d1q70pf5vjeyhc.cloudfront.net/predictions/c31d8fb2a0dd430581d458e9710c6a1d/1.mp4"
+            "url": "https://raw.githubusercontent.com/WaveSpeedAI/wavespeed-comfyui/afdf9ff3a73ef972c7d0f82ed5f8d55258cff30d/examples/case2-text-to-video/case2.mp4"
           }
         ]
       }

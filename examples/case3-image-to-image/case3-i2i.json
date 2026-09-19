@@ -216,7 +216,7 @@
         "media_data": [
           {
             "type": "image",
-            "url": "https://d1q70pf5vjeyhc.cloudfront.net/predictions/356017ea9dd740238c9cd082cde3c6c7/1.png"
+            "url": "https://raw.githubusercontent.com/WaveSpeedAI/wavespeed-comfyui/afdf9ff3a73ef972c7d0f82ed5f8d55258cff30d/examples/case3-image-to-image/case3.png"
           }
         ]
       }

@@ -119,7 +119,7 @@
         "media_data": [
           {
             "type": "image",
-            "url": "https://d1q70pf5vjeyhc.cloudfront.net/predictions/3d34d97465a249a2a5ada2269f20c04c/1.png"
+            "url": "https://raw.githubusercontent.com/WaveSpeedAI/wavespeed-comfyui/afdf9ff3a73ef972c7d0f82ed5f8d55258cff30d/examples/case1-text-to-image/case1.png"
           }
         ]
       }

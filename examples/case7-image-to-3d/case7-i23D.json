@@ -261,12 +261,8 @@
       "wavespeed_preview": {
         "media_data": [
           {
-            "type": "image",
-            "url": "https://d1q70pf5vjeyhc.cloudfront.net/predictions/c343fb91e21e4ee782e15dfa46ce00a8/0.webp"
-          },
-          {
             "type": "3d",
-            "url": "https://d1q70pf5vjeyhc.cloudfront.net/predictions/c343fb91e21e4ee782e15dfa46ce00a8/1.glb"
+            "url": "https://raw.githubusercontent.com/WaveSpeedAI/wavespeed-comfyui/afdf9ff3a73ef972c7d0f82ed5f8d55258cff30d/examples/case7-image-to-3d/case7.glb"
           }
         ]
       }

@@ -175,7 +175,7 @@
         "media_data": [
           {
             "type": "audio",
-            "url": "https://d1q70pf5vjeyhc.cloudfront.net/predictions/4ed78af6f67c4310899cb6dc66c245d6/1.mp3"
+            "url": "https://raw.githubusercontent.com/WaveSpeedAI/wavespeed-comfyui/afdf9ff3a73ef972c7d0f82ed5f8d55258cff30d/examples/case6-text-to-audio/case6.mp3"
           }
         ]
       }

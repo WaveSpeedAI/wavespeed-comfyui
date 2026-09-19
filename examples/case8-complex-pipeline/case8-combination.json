@@ -117,7 +117,7 @@
         "media_data": [
           {
             "type": "image",
-            "url": "https://d1q70pf5vjeyhc.cloudfront.net/predictions/bb26d1966ab34d39aa9ffda68eca8448/1.jpeg"
+            "url": "https://raw.githubusercontent.com/WaveSpeedAI/wavespeed-comfyui/afdf9ff3a73ef972c7d0f82ed5f8d55258cff30d/examples/case8-complex-pipeline/case8_1.jpeg"
           }
         ]
       }
@@ -359,7 +359,7 @@
         "media_data": [
           {
             "type": "image",
-            "url": "https://d1q70pf5vjeyhc.cloudfront.net/predictions/f0dd50f682834bfab864bbb5956e276c/1.jpeg"
+            "url": "https://raw.githubusercontent.com/WaveSpeedAI/wavespeed-comfyui/afdf9ff3a73ef972c7d0f82ed5f8d55258cff30d/examples/case8-complex-pipeline/case8_2.jpeg"
           }
         ]
       }
@@ -582,7 +582,7 @@
         "media_data": [
           {
             "type": "video",
-            "url": "https://d1q70pf5vjeyhc.cloudfront.net/predictions/cf8a04889368405784e0bd13c6faaed8/1.mp4"
+            "url": "https://raw.githubusercontent.com/WaveSpeedAI/wavespeed-comfyui/afdf9ff3a73ef972c7d0f82ed5f8d55258cff30d/examples/case8-complex-pipeline/case8.mp4"
           }
         ]
       }
