@@ -5,3 +5,7 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # One pull request per run instead of one per action.
+    groups:
+      actions:
+        patterns: ['*']
