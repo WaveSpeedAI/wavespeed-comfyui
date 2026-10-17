@@ -44,7 +44,6 @@ class WaveSpeedClient:
             api_key (str): WaveSpeed AI API key
         """
         self.api_key = api_key
-        self.once_timeout = 1800  # Default timeout is 1800 seconds (30 minutes)
 
         self.headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json", **get_client_headers()}
 
@@ -192,22 +191,22 @@ class WaveSpeedClient:
         Args:
             request_id (str, optional): Task ID.
             polling_interval (int): Polling interval in seconds.
-            timeout (int): Maximum time to wait for task completion in seconds.
+            timeout (int, optional): Maximum time to wait in seconds. None/0 (default) means
+                no overall cap: wait until the task reaches a terminal status (tasks can run
+                for hours). Per-request timeouts and poll retries still apply.
 
         Returns:
             dict: Task result.
 
         Raises:
-            Exception: If the task fails or times out.
+            Exception: If the task fails, is cancelled/timed out/deleted, or a positive
+                `timeout` elapses first.
         """
-        if not timeout:
-            timeout = self.once_timeout
-
         if not request_id:
             raise Exception("No valid task ID provided")
 
         start_time = time.time()
-        while time.time() - start_time < timeout:
+        while not timeout or time.time() - start_time < timeout:
             task_status = self.check_task_status(request_id)
             status = task_status.get("status")
 
@@ -229,7 +228,7 @@ class WaveSpeedClient:
             request (BaseRequest): The request object containing payload and endpoint logic.
             wait_for_completion (bool, optional): Whether to wait for task completion.
             polling_interval (int): Polling interval in seconds.
-            timeout (int): Maximum time to wait for task completion in seconds.
+            timeout (int, optional): Overall wait cap in seconds; None/0 = no cap.
 
         Returns:
             dict: API response or task result.

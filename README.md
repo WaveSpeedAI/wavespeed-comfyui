@@ -141,7 +141,7 @@ Restart ComfyUI after installation.
 - Camera movement control
 - Audio generation option
 
-**Note:** Video generation may take several minutes. The plugin supports up to 30-minute timeout for long-running tasks.
+**Note:** Video generation may take several minutes. The plugin has no overall wait limit: it keeps waiting until the task completes, fails or is cancelled.
 
 **Result:**
 
@@ -498,7 +498,7 @@ The first load fetches the complete model list from WaveSpeed API (5-10 seconds)
 <details>
 <summary><b>Q: How do I handle "Task timed out" errors?</b></summary>
 
-The default timeout is 30 minutes. For longer tasks:
+The plugin does not impose an overall wait limit; "Task timed out" means the server reported the task as timed out. Try:
 1. Check your network connection
 2. Try a different model
 3. Reduce output resolution/duration
@@ -530,7 +530,7 @@ No, but you can:
 - Check ComfyUI console for error messages
 
 **Issue: "Task timeout"**
-- Solution: Video generation can take up to 30 minutes
+- Solution: The plugin waits as long as the task runs; a timeout status comes from the server
 - Check network connection
 - Try reducing output resolution/duration
 
@@ -604,7 +604,7 @@ Our support team is ready to assist you with any questions or issues.
 - Smart output detection and format conversion
 - Automatic tensor upload and conversion
 - Real-time progress tracking
-- Support for long-running tasks (30-minute timeout)
+- Support for long-running tasks (no overall wait limit)
 - VideoFromFile support for video-to-video models
 - Size component widget for resolution parameters
 - Workflow save/restore functionality

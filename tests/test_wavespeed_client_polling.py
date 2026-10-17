@@ -83,6 +83,35 @@ class PollingTest(unittest.TestCase):
         self.assertEqual(len(server.requests), 3)
         self.assertEqual([c.args[0] for c in sleep.call_args_list], [1.0, 2.0])
 
+    def test_no_default_cap_waits_past_30_minutes(self):
+        client, _ = self.make([])
+        clock = [1000.0]
+        # 12 hours of "processing" at 5s polls, then completed.
+        polls = {"n": 0}
+
+        def fake_status(_rid):
+            polls["n"] += 1
+            return {"status": "processing"} if clock[0] < 1000.0 + 12 * 3600 else {"status": "completed", "id": "t1"}
+
+        def fake_sleep(s):
+            clock[0] += s
+
+        with patch.object(client, "check_task_status", side_effect=fake_status), \
+                patch.object(client_mod.time, "sleep", side_effect=fake_sleep), \
+                patch.object(client_mod.time, "time", side_effect=lambda: clock[0]):
+            result = client.wait_for_task("t1", polling_interval=5)
+        self.assertEqual(result["status"], "completed")
+        self.assertGreater(clock[0] - 1000.0, 1800)
+
+    def test_explicit_timeout_still_applies(self):
+        client, _ = self.make([])
+        clock = [0.0]
+        with patch.object(client, "check_task_status", return_value={"status": "processing"}), \
+                patch.object(client_mod.time, "sleep", side_effect=lambda s: clock.__setitem__(0, clock[0] + s)), \
+                patch.object(client_mod.time, "time", side_effect=lambda: clock[0]):
+            with self.assertRaisesRegex(Exception, "timed out"):
+                client.wait_for_task("t1", polling_interval=5, timeout=60)
+
     def test_persistent_poll_failure_names_task_id(self):
         client, server = self.make([502] * 20)
         with patch.object(client_mod.time, "sleep") as sleep:

@@ -1152,7 +1152,7 @@ class WaveSpeedAIPredictor:
                 dynamic_request,
                 wait_for_completion=True,
                 polling_interval=5,
-                timeout=1800  # 30 minutes timeout for long-running tasks (video generation, etc.)
+                timeout=None  # no overall cap: tasks can run for hours; wait for a terminal status
             )
 
             if not response:
