@@ -25,8 +25,13 @@ def imageurl2tensor(image_urls: List[str]):
     return images2tensor(images)
 
 
+# Output downloads: (connect, read). Read is idle time between chunks, so a large
+# file that keeps streaming is not cut off.
+DOWNLOAD_TIMEOUT = (10, 120)
+
+
 def fetch_image(url, stream=True):
-    return requests.get(url, stream=stream).content
+    return requests.get(url, stream=stream, timeout=DOWNLOAD_TIMEOUT).content
 
 
 def save_video(video: VideoInput, save_path: str):
