@@ -3,6 +3,7 @@ import sys
 import threading
 import types
 import unittest
+import unittest.mock
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from unittest.mock import patch
@@ -111,6 +112,20 @@ class PollingTest(unittest.TestCase):
                 patch.object(client_mod.time, "time", side_effect=lambda: clock[0]):
             with self.assertRaisesRegex(Exception, "timed out"):
                 client.wait_for_task("t1", polling_interval=5, timeout=60)
+
+    def test_per_request_timeouts_by_type(self):
+        client, _ = self.make([])
+        ok = unittest.mock.Mock(status_code=200)
+        ok.json.return_value = {"code": 200, "data": {"id": "t1", "status": "completed"}}
+        with patch.object(client.session, "post", return_value=ok) as post, \
+                patch.object(client.poll_session, "get", return_value=ok) as poll_get, \
+                patch.object(client.session, "get", return_value=ok) as plain_get:
+            client.post("/api/v3/x", {})
+            client.check_task_status("t1")
+            client.get("/api/v3/balance")
+        self.assertEqual(60, post.call_args.kwargs["timeout"][1])
+        self.assertEqual(30, poll_get.call_args.kwargs["timeout"][1])
+        self.assertEqual(30, plain_get.call_args.kwargs["timeout"][1])
 
     def test_persistent_poll_failure_names_task_id(self):
         client, server = self.make([502] * 20)

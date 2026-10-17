@@ -1,11 +1,16 @@
 """Provider-agnostic direct uploads for WaveSpeed media."""
 
+import aiohttp
 import requests
 
 try:
     from .wavespeed_client_info import get_client_headers
 except ImportError:
     from wavespeed_client_info import get_client_headers
+
+
+# Per-request timeout for each upload step (ticket request and file PUT), in seconds.
+UPLOAD_TIMEOUT_SECONDS = 120
 
 
 def _ticket_payload(file_bytes, filename, content_type=None):
@@ -33,7 +38,7 @@ def upload_bytes(file_bytes, filename, content_type, api_key, base_url="https://
         f"{base_url.rstrip('/')}/api/v3/media/uploads",
         json=_ticket_payload(file_bytes, filename, content_type),
         headers={"Authorization": f"Bearer {api_key}", **get_client_headers()},
-        timeout=(15, 180),
+        timeout=(15, UPLOAD_TIMEOUT_SECONDS),
     )
     if ticket.status_code != 200:
         raise ValueError(f"Upload ticket failed with status {ticket.status_code}: {ticket.text}")
@@ -44,7 +49,7 @@ def upload_bytes(file_bytes, filename, content_type, api_key, base_url="https://
         upload["url"],
         data=file_bytes,
         headers=upload.get("headers") or {},
-        timeout=(15, 180),
+        timeout=(15, UPLOAD_TIMEOUT_SECONDS),
     )
     if not 200 <= response.status_code < 300:
         raise ValueError(f"Upload failed with status {response.status_code}: {response.text}")
@@ -58,6 +63,7 @@ async def upload_bytes_async(session, file_bytes, filename, content_type, api_ke
         f"{base_url.rstrip('/')}/api/v3/media/uploads",
         json=_ticket_payload(file_bytes, filename, content_type),
         headers=headers,
+        timeout=aiohttp.ClientTimeout(total=UPLOAD_TIMEOUT_SECONDS),
     ) as response:
         if response.status != 200:
             raise ValueError(f"Upload ticket failed with status {response.status}: {await response.text()}")
@@ -68,6 +74,7 @@ async def upload_bytes_async(session, file_bytes, filename, content_type, api_ke
         upload["url"],
         data=file_bytes,
         headers=upload.get("headers") or {},
+        timeout=aiohttp.ClientTimeout(total=UPLOAD_TIMEOUT_SECONDS),
     ) as response:
         if not 200 <= response.status < 300:
             raise ValueError(f"Upload failed with status {response.status}: {await response.text()}")

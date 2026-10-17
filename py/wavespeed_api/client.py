@@ -15,6 +15,9 @@ from ..wavespeed_client_info import get_client_headers
 # Task submission (POST) is single-shot and is never retried on status/read
 # errors, because a retried submit can create a second paid task.
 POLL_RETRYABLE_STATUS = (429, 500, 502, 503, 504)
+# Per-request timeouts by request type (seconds). There is no overall wait cap.
+GET_TIMEOUT_SECONDS = 30  # result polling and read-only GETs
+SUBMIT_TIMEOUT_SECONDS = 60  # async task submit POST (a timeout here is an ambiguous outcome)
 POLL_MAX_RETRIES = 5
 POLL_BACKOFF_SECONDS = 1.0
 
@@ -75,7 +78,7 @@ class WaveSpeedClient:
         self.poll_session.mount("http://", poll_adapter)
         self.poll_session.mount("https://", poll_adapter)
 
-    def post(self, endpoint, payload, timeout=60):
+    def post(self, endpoint, payload, timeout=SUBMIT_TIMEOUT_SECONDS):
         """
         Send POST request to WaveSpeed AI API
 
@@ -117,7 +120,7 @@ class WaveSpeedClient:
             return response_data.get('data', {})
         return response_data
 
-    def get(self, endpoint, params=None, timeout=30, session=None, raise_transient=False):
+    def get(self, endpoint, params=None, timeout=GET_TIMEOUT_SECONDS, session=None, raise_transient=False):
         """
         Send GET request to WaveSpeed AI API
 
@@ -173,7 +176,7 @@ class WaveSpeedClient:
         endpoint = f"/api/v3/predictions/{request_id}/result"
         for attempt in range(POLL_MAX_RETRIES + 1):
             try:
-                return self.get(endpoint, timeout=30, session=self.poll_session, raise_transient=True)
+                return self.get(endpoint, timeout=GET_TIMEOUT_SECONDS, session=self.poll_session, raise_transient=True)
             except (TransientHTTPError, requests.exceptions.RequestException) as e:
                 if attempt >= POLL_MAX_RETRIES:
                     raise Exception(
@@ -239,8 +242,7 @@ class WaveSpeedClient:
             payload["seed"] = payload["seed"] % 9999999999 if payload["seed"] != -1 else -1
 
         # Use appropriate timeout for initial request submission
-        initial_timeout = 60  # 60s for initial request submission
-        response = self.post(request.get_api_path(), payload, timeout=initial_timeout)
+        response = self.post(request.get_api_path(), payload, timeout=SUBMIT_TIMEOUT_SECONDS)
 
         request_id = response.get("id")
         if not request_id:

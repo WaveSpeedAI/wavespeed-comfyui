@@ -58,6 +58,21 @@ class UploadTest(unittest.TestCase):
         self.assertEqual(CLIENT_VERSION, headers["X-Client-Version"])
         self.assertIn(headers["X-Client-OS"], {"linux", "darwin", "win32"})
 
+    def test_upload_steps_use_120s_read_timeout(self):
+        ticket = Mock(status_code=200)
+        ticket.json.return_value = {
+            "code": 200,
+            "data": {"download_url": "https://e/x.png", "upload": {"method": "PUT", "url": "https://s/u"}},
+        }
+        session = Mock()
+        session.post.return_value = ticket
+        session.request.return_value = Mock(status_code=200)
+
+        upload_bytes(b"image", "file.png", "image/png", "secret", session=session)
+
+        self.assertEqual(120, session.post.call_args.kwargs["timeout"][1])
+        self.assertEqual(120, session.request.call_args.kwargs["timeout"][1])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -136,7 +136,7 @@ async def fetch_model_catalog_from_api():
         "User-Agent": "ComfyUI-WaveSpeedAI-API/1.0.0",
         **get_client_headers(),
     }
-    timeout = aiohttp.ClientTimeout(total=60, connect=10)
+    timeout = aiohttp.ClientTimeout(total=30, connect=10)
     async with aiohttp.ClientSession(timeout=timeout) as session:
         async with session.get(MODEL_CATALOG_URL, headers=headers) as resp:
             if resp.status in (401, 403):
@@ -525,7 +525,7 @@ async def upload_file_or_tensor(request):
                         content_type = guessed_type
 
             # Upload to WaveSpeed cloud API (v3)
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=180)) as session:
+            async with aiohttp.ClientSession() as session:
                 download_url = await upload_bytes_async(
                     session, file_data, filename or 'upload', content_type, api_key
                 )
