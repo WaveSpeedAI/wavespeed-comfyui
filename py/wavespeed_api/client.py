@@ -10,6 +10,23 @@ from ..wavespeed_upload import upload_bytes
 from ..wavespeed_client_info import get_client_headers
 
 
+# Polling tolerance, aligned with wavespeed-python (api/client.py): transient
+# failures on the result GET are retried with growing backoff (1s * (n + 1)).
+# Task submission (POST) is single-shot and is never retried on status/read
+# errors, because a retried submit can create a second paid task.
+POLL_RETRYABLE_STATUS = (429, 500, 502, 503, 504)
+POLL_MAX_RETRIES = 5
+POLL_BACKOFF_SECONDS = 1.0
+
+
+class TransientHTTPError(Exception):
+    """A poll GET returned a retryable HTTP status."""
+
+    def __init__(self, status_code, message):
+        super().__init__(message)
+        self.status_code = status_code
+
+
 class WaveSpeedClient:
     """
     WaveSpeed AI API Client
@@ -51,6 +68,13 @@ class WaveSpeedClient:
 
         self.session.mount("http://", adapter)
         self.session.mount("https://", adapter)
+
+        # Polling session: no urllib3 retries, check_task_status owns the retry
+        # loop so the total tolerance (and the task id in errors) is explicit.
+        self.poll_session = requests.Session()
+        poll_adapter = HTTPAdapter(max_retries=0, pool_connections=10, pool_maxsize=20)
+        self.poll_session.mount("http://", poll_adapter)
+        self.poll_session.mount("https://", poll_adapter)
 
     def post(self, endpoint, payload, timeout=60):
         """
@@ -94,7 +118,7 @@ class WaveSpeedClient:
             return response_data.get('data', {})
         return response_data
 
-    def get(self, endpoint, params=None, timeout=30):
+    def get(self, endpoint, params=None, timeout=30, session=None, raise_transient=False):
         """
         Send GET request to WaveSpeed AI API
 
@@ -112,7 +136,10 @@ class WaveSpeedClient:
         read_timeout = timeout
         timeout_tuple = (connect_timeout, read_timeout)
 
-        response = self.session.get(url, headers=self.headers, params=params, timeout=timeout_tuple)
+        response = (session or self.session).get(url, headers=self.headers, params=params, timeout=timeout_tuple)
+
+        if raise_transient and response.status_code in POLL_RETRYABLE_STATUS:
+            raise TransientHTTPError(response.status_code, f"Error: {response.status_code}")
 
         if response.status_code != 200:
             error_message = f"Error: {response.status_code}"
@@ -144,7 +171,19 @@ class WaveSpeedClient:
         if not request_id:
             raise Exception("No valid task ID provided")
         # Use 30s timeout for status checks - these should be quick
-        return self.get(f"/api/v3/predictions/{request_id}/result", timeout=30)
+        endpoint = f"/api/v3/predictions/{request_id}/result"
+        for attempt in range(POLL_MAX_RETRIES + 1):
+            try:
+                return self.get(endpoint, timeout=30, session=self.poll_session, raise_transient=True)
+            except (TransientHTTPError, requests.exceptions.RequestException) as e:
+                if attempt >= POLL_MAX_RETRIES:
+                    raise Exception(
+                        f"Failed to get status of task {request_id} after {POLL_MAX_RETRIES + 1} attempts: "
+                        f"{e}. The task may still be running on WaveSpeed; check it in your dashboard."
+                    ) from e
+                time.sleep(POLL_BACKOFF_SECONDS * (attempt + 1))
+            except Exception as e:
+                raise Exception(f"Failed to get status of task {request_id}: {e}") from e
 
     def wait_for_task(self, request_id, polling_interval=5, timeout=None):
         """
