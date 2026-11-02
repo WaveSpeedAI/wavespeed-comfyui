@@ -586,7 +586,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 Need help? We're here for you:
 
 - 🌐 **Official Website**: [wavespeed.ai](https://wavespeed.ai) - Live chat support available
-- 💬 **Discord**: [Join our community](https://discord.gg/cXhE4X9mD)
+- 💬 **Discord**: [Join our community](https://discord.gg/ajhuc7hr79)
 - 📖 **Documentation**: [WaveSpeed Docs](https://wavespeed.ai/docs)
 - 🐛 **Bug Reports**: [GitHub Issues](https://github.com/WaveSpeedAI/wavespeed-comfyui/issues)
 
