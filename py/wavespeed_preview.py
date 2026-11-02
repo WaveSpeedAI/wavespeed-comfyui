@@ -18,7 +18,7 @@ import cv2
 from fractions import Fraction
 from comfy_api.latest._input_impl.video_types import VideoFromComponents
 from comfy_api.latest._util import VideoComponents
-from .wavespeed_api.utils import imageurl2tensor
+from .wavespeed_api.utils import imageurl2tensor, safe_request
 
 
 class WaveSpeedAIPreview:
@@ -252,8 +252,7 @@ class WaveSpeedAIPreview:
             Content-Type string or None
         """
         try:
-            import requests
-            response = requests.head(url, timeout=5, allow_redirects=True)
+            response = safe_request("HEAD", url, timeout=5)
             content_type = response.headers.get('Content-Type', '').lower()
             return content_type
         except Exception as e:
@@ -305,7 +304,7 @@ class WaveSpeedAIPreview:
         try:
             # Download video to temporary file
             print(f"[WaveSpeed Preview] Downloading video from {video_url}")
-            response = requests.get(video_url, stream=True, timeout=30)
+            response = safe_request("GET", video_url, stream=True, timeout=30)
             response.raise_for_status()
 
             # Create temporary file

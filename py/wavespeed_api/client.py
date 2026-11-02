@@ -1,5 +1,6 @@
 import time
 import requests
+from urllib.parse import urlsplit
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from .utils import BaseRequest
@@ -38,6 +39,18 @@ class WaveSpeedClient:
     """
 
     BASE_URL = "https://api.wavespeed.ai"
+
+    def _api_url(self, endpoint):
+        """Join an API path onto BASE_URL; refuse anything that leaves the API host.
+
+        The path comes from the workflow (model_id), so a crafted value such as
+        "@other.host/x" must never send the Authorization header elsewhere.
+        """
+        url = f"{self.BASE_URL}{endpoint}"
+        if not isinstance(endpoint, str) or not endpoint.startswith("/") or \
+                urlsplit(url).netloc != urlsplit(self.BASE_URL).netloc:
+            raise ValueError(f"Invalid WaveSpeed API path: {endpoint!r}")
+        return url
 
     def __init__(self, api_key):
         """
@@ -90,7 +103,7 @@ class WaveSpeedClient:
         Returns:
             dict: API response
         """
-        url = f"{self.BASE_URL}{endpoint}"
+        url = self._api_url(endpoint)
         # Use tuple for timeout: (connect_timeout, read_timeout)
         connect_timeout = min(15, timeout / 4)  # Up to 15s for connection, or 1/4 of total timeout
         read_timeout = timeout
@@ -132,7 +145,7 @@ class WaveSpeedClient:
         Returns:
             dict: API response
         """
-        url = f"{self.BASE_URL}{endpoint}"
+        url = self._api_url(endpoint)
         # Use tuple for timeout: (connect_timeout, read_timeout)
         connect_timeout = min(10, timeout / 3)  # Up to 10s for connection, or 1/3 of total timeout
         read_timeout = timeout

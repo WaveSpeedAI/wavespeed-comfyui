@@ -1,5 +1,8 @@
 import requests
 import base64
+import ipaddress
+import socket
+from urllib.parse import urljoin, urlsplit
 import io
 import os
 import numpy
@@ -30,8 +33,35 @@ def imageurl2tensor(image_urls: List[str]):
 DOWNLOAD_TIMEOUT = (10, 120)
 
 
+MAX_REDIRECTS = 5
+
+
+def _check_public_url(url):
+    """Allow only http(s) URLs whose host resolves to public addresses (no SSRF)."""
+    parts = urlsplit(url)
+    if parts.scheme not in ("http", "https") or not parts.hostname:
+        raise ValueError(f"Unsupported media URL: {url}")
+    port = parts.port or (443 if parts.scheme == "https" else 80)
+    for info in socket.getaddrinfo(parts.hostname, port, proto=socket.IPPROTO_TCP):
+        if not ipaddress.ip_address(info[4][0].split("%")[0]).is_global:
+            raise ValueError(f"Refusing to fetch a non-public address: {parts.hostname}")
+
+
+def safe_request(method, url, timeout, **kwargs):
+    """requests.request for media URLs; every redirect hop is checked too."""
+    kwargs["allow_redirects"] = False
+    for _ in range(MAX_REDIRECTS + 1):
+        _check_public_url(url)
+        response = requests.request(method, url, timeout=timeout, **kwargs)
+        if not response.is_redirect:
+            return response
+        url = urljoin(url, response.headers["Location"])
+        response.close()
+    raise ValueError("Too many redirects")
+
+
 def fetch_image(url, stream=True):
-    return requests.get(url, stream=stream, timeout=DOWNLOAD_TIMEOUT).content
+    return safe_request("GET", url, stream=stream, timeout=DOWNLOAD_TIMEOUT).content
 
 
 def save_video(video: VideoInput, save_path: str):

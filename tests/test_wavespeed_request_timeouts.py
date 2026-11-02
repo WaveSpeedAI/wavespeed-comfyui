@@ -28,10 +28,13 @@ def load_utils():
 class RequestTimeoutTest(unittest.TestCase):
     def test_fetch_image_is_bounded(self):
         utils = load_utils()
-        with patch.object(utils.requests, "get") as get:
-            get.return_value.content = b"x"
+        public = [(0, 0, 0, "", ("93.184.216.34", 443))]
+        with patch.object(utils.socket, "getaddrinfo", return_value=public), \
+                patch.object(utils.requests, "request") as request:
+            request.return_value.is_redirect = False
+            request.return_value.content = b"x"
             utils.fetch_image("https://cdn.example/a.png")
-        self.assertEqual((10, 120), get.call_args.kwargs["timeout"])
+        self.assertEqual((10, 120), request.call_args.kwargs["timeout"])
 
     def test_predictor_makes_no_direct_http_calls(self):
         src = (PY_DIR / "wavespeed_predictor.py").read_text()

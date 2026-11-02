@@ -1,0 +1,8 @@
+# Keep the registry zip under its 100MB limit: demo media stays on GitHub only.
+examples/**/*.mp4
+examples/**/*.glb
+examples/**/*.png
+examples/**/*.jpg
+examples/**/*.jpeg
+examples/**/*.webp
+examples/**/*.gif
