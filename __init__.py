@@ -1,11 +1,8 @@
 import importlib.util
 import os
-import subprocess
 import sys
 
-python = sys.executable
-
-# --- Ensure critical dependencies are installed ---
+# --- Report missing dependencies (installed from requirements.txt by ComfyUI-Manager / comfy-cli) ---
 _REQUIRED_PACKAGES = {
     "cv2": "opencv-python",
     "scipy": "scipy",
@@ -13,15 +10,12 @@ _REQUIRED_PACKAGES = {
     "pydantic": "pydantic",
 }
 
-for _mod_name, _pip_name in _REQUIRED_PACKAGES.items():
-    try:
-        importlib.import_module(_mod_name)
-    except ImportError:
-        print(f"[WaveSpeed] Installing missing dependency: {_pip_name}")
-        try:
-            subprocess.check_call([python, "-m", "pip", "install", _pip_name, "--quiet"])
-        except Exception as _e:
-            print(f"[WaveSpeed] Failed to install {_pip_name}: {_e}")
+_missing = [pip for mod, pip in _REQUIRED_PACKAGES.items() if importlib.util.find_spec(mod) is None]
+if _missing:
+    print(
+        f"[WaveSpeed] Missing dependencies: {', '.join(_missing)}. "
+        f"Install this node's requirements.txt into ComfyUI's Python ({sys.executable}); see the README."
+    )
 
 # Import API endpoints to register routes
 try:
